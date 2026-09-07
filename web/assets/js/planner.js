@@ -1,8 +1,15 @@
 // Family Central Command — vanilla canvas build (no framework).
-import * as store from './store.js?v=3';
-import { GCal } from './gcal.js?v=3';
-import { currentConditions } from './wx.js?v=3';
-import config from '../../config.js';
+import * as store from './store.js';
+import { GCal } from './gcal.js';
+import { currentConditions } from './wx.js';
+import { loadConfig, isConfigured } from './config-loader.js';
+import { openSetup } from './setup.js';
+import { loadDisplay, applyLayout, applyTheme, startDim, openDisplaySettings } from './display.js';
+
+const config = await loadConfig();
+const display = loadDisplay();
+applyTheme(display);
+store.initStore(config.firebase);
 
 const $ = (id) => document.getElementById(id);
 const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
@@ -12,20 +19,26 @@ const parseLocal = (s) => { const [y, m, d] = s.split('-').map(Number); return n
 const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const FULL = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-const KIDS = config.family.kids;
-const CHORES_PER_KID = 3;
+const KIDS = config.family.kids || [];
+const CHORES_PER_KID = display.choresPerKid;
 
 /* ---------- branding from config ---------- */
 document.title = `${config.family.title} — ${config.family.subtitle}`;
 $('hdr-title').firstChild.textContent = config.family.title;
 $('hdr-subtitle').textContent = config.family.subtitle;
-$('wx-place').textContent = config.location.label;
+$('wx-place').textContent = config.location.label || '';
+$('btn-setup').addEventListener('click', () => openSetup(config));
+$('btn-display').addEventListener('click', () => openDisplaySettings(display, () => { if (display.choresPerKid !== CHORES_PER_KID) { location.reload(); return; } lastPortrait = null; fitCanvas(); tickClock(); if (config.location.lat != null) refreshWx(); if (typeof renderAll === 'function') renderAll(); dimTick(); }));
+const dimTick = startDim(display);
+if (!isConfigured(config)) setTimeout(() => openSetup(config, { firstRun: true }), 600);
 { const f = $('status-footer'); f.innerHTML = ''; (config.family.footer || []).forEach((t, i) => { if (i) f.appendChild(el('span', 'sep', '•')); f.appendChild(el('span', null, t)); }); }
 
 /* ---------- canvas scaler: design canvas fitted to any display ---------- */
+let lastPortrait = null;
 function fitCanvas() {
-  const portrait = window.innerHeight > window.innerWidth;
+  const portrait = display.orientation === 'auto' ? window.innerHeight > window.innerWidth : display.orientation === 'portrait';
   const c = $('canvas'); c.classList.toggle('portrait', portrait);
+  if (portrait !== lastPortrait) { lastPortrait = portrait; applyLayout(display, portrait); }
   const [w, h] = portrait ? [1080, 1920] : [1920, 1080];
   const s = Math.min(window.innerWidth / w, window.innerHeight / h);
   c.style.transform = `scale(${s})`;
@@ -43,9 +56,9 @@ let todayKey = dateKey(new Date());
 const onNewDay = [];
 function tickClock() {
   const now = new Date();
-  let h = now.getHours(); const ampm = h >= 12 ? 'PM' : 'AM'; h = h % 12 || 12;
+  let h = now.getHours(); const ampm = h >= 12 ? 'PM' : 'AM'; if (!display.clock24) h = h % 12 || 12;
   $('hdr-clock').textContent = `${pad(h)}:${pad(now.getMinutes())}`;
-  $('hdr-ampm').textContent = ampm;
+  $('hdr-ampm').textContent = display.clock24 ? '' : ampm;
   $('hdr-date').textContent = now.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' }).toUpperCase();
   const k = dateKey(now);
   if (k !== todayKey) { todayKey = k; onNewDay.forEach((f) => f()); }
@@ -61,19 +74,21 @@ $('btn-full').addEventListener('click', () => {
 /* ---------- outside temp (NWS) ---------- */
 async function refreshWx() {
   try {
-    const w = await currentConditions();
-    $('hdr-temp').textContent = w.tempF;
+    const w = await currentConditions(config.location);
+    $('hdr-temp').textContent = display.units === 'metric' ? Math.round((w.tempF - 32) * 5 / 9) : w.tempF;
+    document.querySelector('.lcd.temp .unit').textContent = display.units === 'metric' ? '°C' : '°F';
     $('hdr-cond').textContent = w.cond;
     led('led-wx', 'on');
   } catch (e) { console.warn('NWS:', e); led('led-wx', 'warn'); }
 }
-refreshWx();
+if (config.location.lat == null) { led('led-wx', 'warn'); $('wx-frame').removeAttribute('src'); }
+else refreshWx();
 setInterval(refreshWx, 10 * 60 * 1000);
 
 /* ---------- WeatherStar 4000+ (clean upstream ws4kp build, kiosk mode) ---------- */
-{
+if (config.location.lat != null) {
   const latLon = encodeURIComponent(JSON.stringify({ lat: config.location.lat, lon: config.location.lon }));
-  $('wx-frame').src = `ws4kp/index.html?settings-kiosk-checkbox=true&settings-units-select=us&latLon=${latLon}&v=4`;
+  $('wx-frame').src = `ws4kp/index.html?settings-kiosk-checkbox=true&settings-units-select=${display.units}&latLon=${latLon}&v=6`;
 }
 
 /* ---------- check lists: shopping + notes ---------- */
@@ -132,6 +147,7 @@ const mealBoxes = {};
 /* ---------- chores ---------- */
 {
   const wrap = $('kids');
+  if (!KIDS.length) wrap.appendChild(el('div', 'empty', 'Add your kids in ⚙ Setup to use the chore board.'));
   KIDS.forEach((kid) => {
     const box = el('div', 'kid'); box.style.setProperty('--kid', kid.color);
     box.appendChild(el('div', 'kn', kid.name.toUpperCase()));
@@ -161,7 +177,7 @@ const mealBoxes = {};
 }
 
 /* ---------- calendar ---------- */
-const gcal = new GCal();
+const gcal = new GCal({ clientId: config.googleClientId, holidayCalendarId: config.holidayCalendarId });
 let events = [];      // raw Google events (selected calendar)
 let holidays = [];    // raw holiday events
 let expanded = [];    // per-day rows {ev, key, isHoliday, multi}
@@ -197,9 +213,10 @@ const fmtTime = (ev) => {
 function renderMonth() {
   const grid = $('cal-grid'); grid.innerHTML = '';
   $('cal-month').textContent = `${MONTHS[viewYM.m].toUpperCase()} ${viewYM.y}`;
-  DOW.forEach((d) => grid.appendChild(el('div', 'dow', d)));
+  const ws = display.weekStart;
+  for (let i = 0; i < 7; i++) grid.appendChild(el('div', 'dow', DOW[(i + ws) % 7]));
   const first = new Date(viewYM.y, viewYM.m, 1);
-  const start = new Date(first); start.setDate(1 - first.getDay());
+  const start = new Date(first); start.setDate(1 - ((first.getDay() - ws + 7) % 7));
   const selKey = dateKey(selected);
   for (let i = 0; i < 42; i++) {
     const d = new Date(start); d.setDate(start.getDate() + i);
