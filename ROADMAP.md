@@ -13,7 +13,7 @@ discussion lives in the linked issue.
 | **Themes** ✅ | `feat/themes` | Four theme packs as token overrides — Hi-Fi (default), LCARS, Paper (light), High contrast — picked per display in ☰ Display. Adding a theme is one CSS block. |
 | **Calendar providers** ✅ | `feat/calendar-providers` | Google + any number of read-only **iCal/ICS feeds** (fetched through a session-gated proxy on either server type; recurrence, exclusions, all-day handled) + a writable **local family calendar** stored in the data backend. All shown together, colour-coded. CalDAV deferred. |
 | **Data backends** ✅ | `feat/data-backends` | `store.js` is a facade over three backends: Firestore, **self-hosted sync store** (a locked JSON file served by `api/db.php` or `tools/serve.py`, polled every 3 s — no cloud account), and browser-local. Chosen in the ⚙ wizard's Data step. |
-| **Weather options** | `feat/weather-options` | WeatherStar display picker (which screens rotate), metric units, and a plain conditions card for outside the US where NWS data does not exist. |
+| **Weather options** ✅ | `feat/weather-options` | Wizard Weather step: pick which WeatherStar screens rotate, speed, scan lines; provider Auto/WeatherStar/card. Outside NWS coverage the panel becomes an **Open-Meteo conditions + 5-day card** in the Star4000 look (auto-detected, worldwide). °C/°F follow the display setting. |
 | **Touch & accessibility** | `feat/touch-a11y` | Bigger hit targets for kids, on-screen keyboard friendliness, screen-reader labels, reduced-motion. |
 
 Not planned: accounts, ads, or any hosted service. The whole point is that you own the box it runs on.

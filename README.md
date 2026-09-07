@@ -20,7 +20,7 @@ Retro hi-fi styling: beveled panels, LCD readouts, pixel headings, and a real We
 |---|---|---|
 | Calendar, week ahead, add/edit/delete events | a **local family calendar** (no account), any **iCal/ICS feeds** (school, sports, iCloud, Outlook — read-only), and/or **Google Calendar** (OAuth in the browser) | all shown together, colour-coded; US holidays overlaid with Google |
 | Shopping list, notes, meals, chores | your choice: **self-hosted sync store** (no cloud), Firebase Firestore, or this-device-only | edits sync between the wall and your phone in the first two |
-| WeatherStar 4000+ | bundled ws4kp 6.2.6 in kiosk mode | National Weather Service data, no API key |
+| WeatherStar 4000+ | bundled ws4kp 6.2.6 in kiosk mode; pick which screens rotate | National Weather Service data, no API key. Outside the US the panel becomes an Open-Meteo conditions + 5-day card in the same retro look |
 | Outside temp in the header | api.weather.gov | no API key |
 | Login gate | a tiny PHP session + password hash | keeps the page private on a public web server |
 

@@ -331,6 +331,7 @@ select option{background:var(--panel);color:var(--text);}
 .dlg input[type=color]{width:44px;height:34px;padding:0;border:1px solid #44444e;border-radius:3px;background:var(--well);}
 .dlg .kv{display:grid;grid-template-columns:150px 1fr;gap:6px 10px;align-items:center;}
 .dlg .kv .k{font-family:var(--font-pixel);font-size:11px;letter-spacing:1px;color:var(--text-dim);}
+.dlg .kv.screens{grid-template-columns:24px 1fr 24px 1fr;}
 .dlg .test-row{display:flex;align-items:center;gap:10px;}
 .dlg .test-out{font-size:13px;color:var(--text-dim);}
 .dlg .test-out.ok{color:var(--grn);}
@@ -423,3 +424,29 @@ select option{background:var(--panel);color:var(--text);}
 .canvas.theme-contrast .cal-grid .dow{background:#fff;color:#000;}
 .canvas.theme-contrast .cal-grid .day.sel{box-shadow:inset 0 0 0 3px #ff0;}
 .canvas.theme-contrast .checklist li,.canvas.theme-contrast .wday,.canvas.theme-contrast .meal,.canvas.theme-contrast .kid,.canvas.theme-contrast .evt{border-color:#fff;}
+
+/* ---------- conditions card (Open-Meteo, outside NWS coverage) — Star4000 face ---------- */
+.wxcard{position:absolute;inset:0;display:flex;flex-direction:column;font-family:var(--font-ws);
+  background:linear-gradient(178deg,#12277d 0%,#1c3aa8 46%,#0c1a56 100%);color:#fff;}
+.wxcard.offline{opacity:.5;filter:grayscale(.4);}
+.wx-head{background:linear-gradient(180deg,#0a1440,#152a86);padding:6px 14px;border-bottom:2px solid #3a55c0;}
+.wx-title{font:700 22px var(--font-ws);color:#ffd11a;letter-spacing:.10em;text-shadow:3px 3px 0 #000;}
+.wx-body{flex:1;display:flex;gap:20px;padding:14px 26px;min-height:0;align-items:center;}
+.wx-left{flex:1;text-align:center;}
+.wx-temp{font:700 96px/1 var(--font-ws);text-shadow:5px 5px 0 #000;}
+.wx-cond{font:700 26px var(--font-ws);color:#ffd11a;text-shadow:3px 3px 0 #000;margin-top:6px;}
+.wx-icon{width:120px;height:120px;image-rendering:pixelated;margin-top:8px;}
+.wx-rows{flex:1.1;display:flex;flex-direction:column;gap:14px;}
+.wx-row{display:flex;justify-content:space-between;gap:10px;}
+.wx-lab{font:700 22px var(--font-ws);color:#8fb4ff;text-shadow:3px 3px 0 #000;}
+.wx-val{font:700 26px var(--font-ws);text-shadow:3px 3px 0 #000;}
+.wx-place{font:700 20px var(--font-ws);color:#8fb4ff;text-align:center;padding:6px 0 10px;text-shadow:3px 3px 0 #000;letter-spacing:.06em;}
+.wx-fc{flex:1;display:grid;grid-template-columns:repeat(5,1fr);gap:8px;padding:14px 18px;align-items:center;}
+.wx-fc[hidden]{display:none;}
+.wx-day{text-align:center;display:flex;flex-direction:column;align-items:center;gap:6px;}
+.wx-day img{width:84px;height:84px;image-rendering:pixelated;}
+.wx-dn{font:700 24px var(--font-ws);color:#ffd11a;text-shadow:3px 3px 0 #000;}
+.wx-hl{font:700 22px var(--font-ws);text-shadow:3px 3px 0 #000;}
+.wx-pp{font:700 18px var(--font-ws);color:#8fb4ff;text-shadow:2px 2px 0 #000;}
+.canvas:not(.portrait) .wx-temp{font-size:72px;}
+.canvas:not(.portrait) .wx-icon{width:90px;height:90px;}
