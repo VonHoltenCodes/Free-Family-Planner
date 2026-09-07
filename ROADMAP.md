@@ -7,7 +7,7 @@ discussion lives in the linked issue.
 
 | Feature | Branch | What it means |
 |---|---|---|
-| **Local-host mode** | `feat/local-host` | `tools/serve.py` exists; add a Docker image, a systemd unit, and Raspberry Pi / Android kiosk guides so the planner runs entirely on the home LAN with no web host. |
+| **Local-host mode** ✅ | `feat/local-host` | `tools/serve.py`, Docker image + compose, systemd units, and Android / Raspberry Pi / Docker kiosk guides in `docs/kiosk/`. |
 | **Setup menu** | `feat/setup-menu` | First-run wizard in the app (⚙ button): family name, kids, location search, paste Firebase + Google keys, test each connection, write the config. No file editing. |
 | **Configuration** | `feat/configuration` | In-app settings: which panels show and in what order, chores per kid, week-start day, 12/24h clock, units, portrait/landscape override, screen-off schedule. Stored per display (local) with optional sync. |
 | **Themes** | `feat/themes` | Theme packs on top of the CSS tokens: the current hi-fi default, an LCARS variant, a light "paper" theme, high-contrast. Theme picker in configuration. |

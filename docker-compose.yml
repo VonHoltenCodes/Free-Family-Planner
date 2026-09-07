@@ -1,0 +1,13 @@
+# Free Family Planner — run on any box on your LAN:
+#   cp web/config.example.js web/config.js   # fill it in
+#   docker compose up -d                     # → http://<this-box>:8765/
+services:
+  family-planner:
+    build: .
+    image: free-family-planner:local
+    container_name: family-planner
+    restart: unless-stopped
+    ports:
+      - "8765:8765"
+    volumes:
+      - ./web/config.js:/app/web/config.js:ro
