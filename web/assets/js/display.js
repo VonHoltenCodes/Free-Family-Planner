@@ -21,6 +21,7 @@ export const DEFAULT_DISPLAY = {
   clock24: false,
   units: 'us',           // 'us' | 'metric'
   orientation: 'auto',   // 'auto' | 'portrait' | 'landscape'
+  theme: 'hifi',         // 'hifi' | 'lcars' | 'paper' | 'contrast'
   dim: { enabled: false, from: '22:00', to: '06:00', level: 0.85 },
 };
 
@@ -34,6 +35,12 @@ export function loadDisplay() {
   return d;
 }
 export const saveDisplay = (d) => localStorage.setItem(LS, JSON.stringify(d));
+export const THEMES = [['hifi', 'Hi-Fi'], ['lcars', 'LCARS'], ['paper', 'Paper'], ['contrast', 'High contrast']];
+export function applyTheme(d) {
+  const c = document.getElementById('canvas');
+  THEMES.forEach(([k]) => c.classList.remove(`theme-${k}`));
+  if (d.theme && d.theme !== 'hifi') c.classList.add(`theme-${d.theme}`);
+}
 
 /* ---------- layout engine ---------- */
 const px = (h) => (h === '1fr' ? 0 : parseInt(h, 10));
@@ -118,6 +125,8 @@ export function openDisplaySettings(d, onChange) {
   const opt = (label, options, value, set) => { const wrap = el('div', 'opt'); wrap.appendChild(el('span', 'k', label)); const grp = el('div', 'seg');
     options.forEach(([v, name]) => { const b = el('button', 'btn sm' + (v === value ? ' on' : ''), name); b.type = 'button'; b.addEventListener('click', () => { set(v); grp.querySelectorAll('.btn').forEach((q) => q.classList.remove('on')); b.classList.add('on'); commit(); }); grp.appendChild(b); });
     wrap.appendChild(grp); return wrap; };
+  body.appendChild(el('div', 'sect', 'Theme'));
+  body.appendChild(opt('Theme', THEMES, d.theme, (v) => { d.theme = v; applyTheme(d); }));
   body.appendChild(el('div', 'sect', 'Behaviour'));
   body.appendChild(opt('Chores per kid', [[1, '1'], [2, '2'], [3, '3'], [4, '4'], [5, '5']], d.choresPerKid, (v) => { d.choresPerKid = v; }));
   body.appendChild(opt('Week starts on', [[0, 'Sunday'], [1, 'Monday']], d.weekStart, (v) => { d.weekStart = v; }));
