@@ -36,15 +36,33 @@ if (!isConfigured(config)) setTimeout(() => openSetup(config, { firstRun: true }
 
 /* ---------- canvas scaler: design canvas fitted to any display ---------- */
 let lastPortrait = null;
+let baseViewport = { w: window.innerWidth, h: window.innerHeight, scale: 1 };
+const isField = (e) => e && (e.tagName === 'INPUT' || e.tagName === 'TEXTAREA' || e.tagName === 'SELECT');
+/* On-screen keyboard: the viewport shrinks while a field is focused. Instead of re-scaling the whole
+   canvas (which makes it jump), keep the scale and slide the canvas so the focused field stays visible. */
+function keyboardGuard() {
+  const vv = window.visualViewport; const h = vv ? vv.height : window.innerHeight; const w = vv ? vv.width : window.innerWidth;
+  const field = document.activeElement; const c = $('canvas');
+  if (!isField(field) || h >= baseViewport.h * 0.9 || w !== baseViewport.w) { c.classList.remove('kbd'); return false; }
+  const r = field.getBoundingClientRect(); const visibleBottom = h - 16;
+  const shift = r.bottom > visibleBottom ? visibleBottom - r.bottom - 8 : 0;
+  c.classList.add('kbd'); c.style.transform = `translateY(${shift}px) scale(${baseViewport.scale})`;
+  return true;
+}
 function fitCanvas() {
+  if (keyboardGuard()) return;
   const portrait = display.orientation === 'auto' ? window.innerHeight > window.innerWidth : display.orientation === 'portrait';
   const c = $('canvas'); c.classList.toggle('portrait', portrait);
   if (portrait !== lastPortrait) { lastPortrait = portrait; applyLayout(display, portrait); }
   const [w, h] = portrait ? [1080, 1920] : [1920, 1080];
   const s = Math.min(window.innerWidth / w, window.innerHeight / h);
   c.style.transform = `scale(${s})`;
+  baseViewport = { w: window.innerWidth, h: window.innerHeight, scale: s };
 }
 window.addEventListener('resize', fitCanvas);
+window.visualViewport?.addEventListener('resize', fitCanvas);
+document.addEventListener('focusin', (e) => { if (isField(e.target)) setTimeout(fitCanvas, 250); });
+document.addEventListener('focusout', () => setTimeout(fitCanvas, 100));
 fitCanvas();
 
 /* ---------- toast + LEDs ---------- */
@@ -106,10 +124,10 @@ function bindList(name, formId, inputId, listId, countId) {
     if (!items.length) { list.appendChild(el('li', 'empty', 'Nothing here.')); }
     items.forEach((it) => {
       const li = el('li', it.completed ? 'done' : '');
-      const chk = el('button', 'chk' + (it.completed ? ' on' : '')); chk.type = 'button'; chk.title = 'Done';
+      const chk = el('button', 'chk' + (it.completed ? ' on' : '')); chk.type = 'button'; chk.title = 'Done'; chk.setAttribute('role', 'switch'); chk.setAttribute('aria-checked', String(!!it.completed)); chk.setAttribute('aria-label', `Done: ${it.text}`);
       chk.addEventListener('click', () => store.toggleListItem(name, it.id, !!it.completed));
       const txt = el('span', 'txt', it.text);
-      const del = el('button', 'del', '×'); del.type = 'button'; del.title = 'Remove';
+      const del = el('button', 'del', '×'); del.type = 'button'; del.title = 'Remove'; del.setAttribute('aria-label', `Remove ${it.text}`);
       del.addEventListener('click', () => store.deleteListItem(name, it.id));
       li.append(chk, txt, del); list.appendChild(li);
     });
@@ -130,10 +148,10 @@ const mealBoxes = {};
   FULL.forEach((day, i) => {
     const card = el('div', 'meal'); card.dataset.day = day;
     const head = el('div', 'mh'); head.appendChild(el('span', 'dn', DOW[i].toUpperCase()));
-    const clr = el('button', 'clr', '×'); clr.type = 'button'; clr.title = 'Clear';
+    const clr = el('button', 'clr', '×'); clr.type = 'button'; clr.title = 'Clear'; clr.setAttribute('aria-label', `Clear ${day} meal`);
     clr.addEventListener('click', () => { meals = { ...meals, [day]: '' }; mealBoxes[day].value = ''; store.saveMeals(meals).catch(() => toast('Save failed')); });
     head.appendChild(clr);
-    const ta = el('textarea'); ta.placeholder = '…'; ta.rows = 3;
+    const ta = el('textarea'); ta.placeholder = '…'; ta.rows = 3; ta.setAttribute('aria-label', `${day} meal`);
     const save = debounce(() => store.saveMeals(meals).catch(() => toast('Save failed')), 500);
     ta.addEventListener('input', () => { meals = { ...meals, [day]: ta.value }; save(); });
     card.append(head, ta); wrap.appendChild(card); mealBoxes[day] = ta;
@@ -158,15 +176,15 @@ const mealBoxes = {};
     const writeText = debounce(write, 500);
     for (let i = 0; i < CHORES_PER_KID; i++) {
       const row = el('div', 'chore');
-      const chk = el('button', 'chk'); chk.type = 'button';
-      const inp = el('input'); inp.type = 'text'; inp.placeholder = `Chore ${i + 1}…`; inp.autocomplete = 'off';
+      const chk = el('button', 'chk'); chk.type = 'button'; chk.setAttribute('role', 'switch'); chk.setAttribute('aria-label', `${kid.name} chore ${i + 1} done`);
+      const inp = el('input'); inp.type = 'text'; inp.placeholder = `Chore ${i + 1}…`; inp.autocomplete = 'off'; inp.setAttribute('aria-label', `${kid.name} chore ${i + 1}`);
       chk.addEventListener('click', () => { items[i] = { ...items[i], completed: !items[i].completed }; render(); write(); });
       inp.addEventListener('input', () => { items[i] = { ...items[i], text: inp.value }; row.classList.toggle('done', !!items[i].completed); writeText(); });
       row.append(chk, inp); box.appendChild(row); rows.push({ row, chk, inp });
     }
     const render = () => rows.forEach((r, i) => {
       const it = items[i] || { id: i, text: '', completed: false };
-      r.chk.classList.toggle('on', !!it.completed); r.row.classList.toggle('done', !!it.completed);
+      r.chk.classList.toggle('on', !!it.completed); r.chk.setAttribute('aria-checked', String(!!it.completed)); r.row.classList.toggle('done', !!it.completed);
       if (document.activeElement !== r.inp && r.inp.value !== (it.text || '')) r.inp.value = it.text || '';
     });
     store.watchChores(kid.id, (remote) => {
@@ -224,7 +242,8 @@ function renderMonth() {
   for (let i = 0; i < 42; i++) {
     const d = new Date(start); d.setDate(start.getDate() + i);
     const key = dateKey(d);
-    const cell = el('div', 'day');
+    const cell = el('div', 'day'); cell.setAttribute('role', 'gridcell'); cell.tabIndex = 0; cell.setAttribute('aria-label', d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }));
+    cell.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); cell.click(); } });
     if (d.getMonth() !== viewYM.m) cell.classList.add('other');
     if (d.getDay() === 0 || d.getDay() === 6) cell.classList.add('wknd');
     if (key === todayKey) cell.classList.add('today');
@@ -247,7 +266,7 @@ function renderDay() {
   const rows = eventsOn(dateKey(selected));
   if (!rows.length) { list.appendChild(el('div', 'empty', 'No events')); return; }
   rows.forEach((r) => {
-    const card = el('div', 'evt' + (r.isHoliday ? ' holiday' : ''));
+    const card = el('div', 'evt' + (r.isHoliday ? ' holiday' : '')); if (!r.isHoliday) { card.tabIndex = 0; card.setAttribute('role', 'button'); card.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); card.click(); } }); }
     const when = el('div', 'when', r.isHoliday ? 'HOLIDAY' : fmtTime(r.ev)); if (r.ev.color && !r.isHoliday) when.style.background = r.ev.color; card.appendChild(when);
     const info = el('div', 'info'); info.appendChild(el('div', 'ttl', r.ev.summary || '(untitled)'));
     const sub = [r.ev.calendarName, r.ev.location, r.multi ? 'Multi-day' : ''].filter(Boolean).join(' • '); if (sub) info.appendChild(el('div', 'loc', sub));
@@ -262,7 +281,7 @@ function renderWeek() {
   const today = new Date(); const selKey = dateKey(selected);
   for (let i = 0; i < 7; i++) {
     const d = new Date(today); d.setDate(today.getDate() + i); const key = dateKey(d);
-    const card = el('div', 'wday' + (i === 0 ? ' today' : '') + (key === selKey ? ' sel' : ''));
+    const card = el('div', 'wday' + (i === 0 ? ' today' : '') + (key === selKey ? ' sel' : '')); card.tabIndex = 0; card.setAttribute('role', 'button'); card.setAttribute('aria-label', d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })); card.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); card.click(); } });
     const h = el('div', 'wh'); h.appendChild(el('span', 'dn', DOW[d.getDay()].toUpperCase())); h.appendChild(el('span', 'dd', d.getDate())); card.appendChild(h);
     const l = el('div', 'wl'); const rows = eventsOn(key);
     if (!rows.length) l.appendChild(el('span', 'empty', 'No events'));
