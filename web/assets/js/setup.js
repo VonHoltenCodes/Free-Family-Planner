@@ -3,12 +3,13 @@
 // otherwise falls back to a localStorage override + a config.js download.
 import { deepMerge, DEFAULTS, LS_KEY } from './config-loader.js';
 import { testFirebase, testSync } from './store.js';
-import { lookupPoint } from './wx.js';
+import { lookupPoint, WS_SCREENS } from './wx.js';
+import { openMeteoConditions } from './wx-card.js';
 import { loadScript } from './gcal.js';
 
 const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
 const slug = (s) => (s || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || `kid-${Date.now()}`;
-const STEPS = ['Family', 'Kids', 'Location', 'Data', 'Calendars', 'Save'];
+const STEPS = ['Family', 'Kids', 'Location', 'Data', 'Calendars', 'Weather', 'Save'];
 const KID_COLORS = ['#ff69b4', '#4169e1', '#2bff66', '#ffd11a', '#ff9f5b', '#c98bdb', '#2bd0ff', '#ff3b2e'];
 
 export function openSetup(current, { firstRun = false } = {}) {
@@ -42,6 +43,10 @@ export function openSetup(current, { firstRun = false } = {}) {
       b.disabled = false; });
     const row = el('div', 'test-row'); row.append(b, out); return row; };
 
+  const opt2 = (label, options, value, set) => { const wrap = el('div', 'opt'); wrap.appendChild(el('span', 'k', label)); const grp = el('div', 'seg');
+    options.forEach(([v, name]) => { const b = el('button', 'btn sm' + (v === value ? ' on' : ''), name); b.type = 'button'; b.addEventListener('click', () => { set(v); grp.querySelectorAll('.btn').forEach((q) => q.classList.remove('on')); b.classList.add('on'); }); grp.appendChild(b); });
+    wrap.appendChild(grp); return wrap; };
+
   const render = () => {
     tabs.innerHTML = ''; STEPS.forEach((s, i) => { const t = el('button', 'step' + (i === step ? ' on' : '') + (i < step ? ' done' : ''), `${i + 1} ${s}`); t.type = 'button'; t.addEventListener('click', () => { step = i; render(); }); tabs.appendChild(t); });
     body.innerHTML = ''; note('');
@@ -66,11 +71,13 @@ export function openSetup(current, { firstRun = false } = {}) {
       const add = el('button', 'btn sm', '+ Add kid'); add.type = 'button'; add.addEventListener('click', () => { f.kids.push({ id: '', name: '', color: KID_COLORS[f.kids.length % KID_COLORS.length] }); draw(); }); body.appendChild(add);
     } else if (step === 2) {
       const loc = draft.location;
-      body.appendChild(el('p', 'lead', 'Drives the WeatherStar panel and the outside-temperature readout (US locations — National Weather Service).'));
+      body.appendChild(el('p', 'lead', 'Drives the weather panel and the outside-temperature readout. US locations get the WeatherStar 4000+ (National Weather Service); anywhere else gets a conditions card (Open-Meteo).'));
+      const usOnly = el('button', 'chk on'); usOnly.type = 'button'; let us = true; usOnly.addEventListener('click', () => { us = !us; usOnly.classList.toggle('on', us); });
+      const usRow = el('div', 'panel-row'); usRow.append(usOnly, el('span', 'pname', 'Search US places only (turn off for the rest of the world)')); body.appendChild(usRow);
       const q = text('', 'City, ST or ZIP', () => {}); const results = el('div', 'geo-results');
       const search = el('button', 'btn sm', 'Search'); search.type = 'button';
       const doSearch = async () => { results.innerHTML = ''; if (!q.value.trim()) return; results.appendChild(el('div', 'hint', 'searching…'));
-        try { const u = `https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/findAddressCandidates?SingleLine=${encodeURIComponent(q.value)}&category=City,Postal&countryCode=USA&maxLocations=6&outFields=City,Region,Postal&f=json`;
+        try { const u = `https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/findAddressCandidates?SingleLine=${encodeURIComponent(q.value)}&category=City,Postal${us ? '&countryCode=USA' : ''}&maxLocations=6&outFields=City,Region,Country&f=json`;
           const r = await (await fetch(u)).json(); results.innerHTML = '';
           (r.candidates || []).forEach((c) => { const b = el('button', 'btn sm geo', c.address); b.type = 'button'; b.addEventListener('click', () => { loc.lat = +c.location.y.toFixed(4); loc.lon = +c.location.x.toFixed(4); loc.label = c.attributes?.City ? `${c.attributes.City}, ${c.attributes.Region}` : c.address; labelI.value = loc.label; latI.value = loc.lat; lonI.value = loc.lon; results.innerHTML = ''; });
             results.appendChild(b); });
@@ -81,7 +88,7 @@ export function openSetup(current, { firstRun = false } = {}) {
       const labelI = text(loc.label, 'Shown on the WeatherStar panel', (v) => { loc.label = v; });
       const latI = text(loc.lat ?? '', '41.8781', (v) => { loc.lat = v === '' ? null : +v; }); const lonI = text(loc.lon ?? '', '-87.6298', (v) => { loc.lon = v === '' ? null : +v; });
       body.appendChild(field('Label', labelI)); const ll = el('div', 'row2'); ll.append(field('Latitude', latI), field('Longitude', lonI)); body.appendChild(ll);
-      body.appendChild(testBtn('Test NWS', async () => { const p = await lookupPoint(loc.lat, loc.lon); return `${p.city}, ${p.state} — station ${p.station}`; }));
+      body.appendChild(testBtn('Test weather', async () => { try { const p = await lookupPoint(loc.lat, loc.lon); return `NWS: ${p.city}, ${p.state} — station ${p.station} → WeatherStar 4000+`; } catch (e) { const c = await openMeteoConditions(loc, 'us'); return `outside NWS coverage → Open-Meteo card (${c.temp}°F, ${c.cond})`; } }));
     } else if (step === 3) {
       const fb = draft.firebase;
       body.appendChild(el('p', 'lead', 'Where the shopping list, notes, meals, chores and the local calendar live.'));
@@ -138,6 +145,15 @@ export function openSetup(current, { firstRun = false } = {}) {
       body.appendChild(el('small', 'hint', `This page's origin: ${location.origin}${location.origin.startsWith('http://') && !/localhost|127\.0\.0\.1/.test(location.origin) ? ' — Google only accepts http://localhost or https:// origins, so sign-in will not work from here.' : ''}`));
       body.appendChild(testBtn('Check client ID', async () => { if (!/\.apps\.googleusercontent\.com$/.test(draft.googleClientId)) throw new Error('does not look like a Google OAuth client ID'); await loadScript('https://accounts.google.com/gsi/client'); return 'Google Identity loaded — sign in from the calendar panel after saving'; }));
     } else if (step === 5) {
+      const wx = draft.weather = { provider: 'auto', screens: {}, speed: 1, scanLines: false, ...(draft.weather || {}) };
+      body.appendChild(el('p', 'lead', 'The weather panel.'));
+      body.appendChild(opt2('Provider', [['auto', 'Auto'], ['weatherstar', 'WeatherStar 4000+'], ['card', 'Conditions card']], wx.provider, (v) => { wx.provider = v; }));
+      body.appendChild(el('small', 'hint', 'Auto = WeatherStar where the US National Weather Service has data, otherwise the Open-Meteo conditions card (works worldwide).'));
+      body.appendChild(el('div', 'sect', 'WeatherStar screens in the rotation'));
+      const grid = el('div', 'kv screens'); WS_SCREENS.forEach(([id, name, on]) => { const chk = el('button', 'chk' + ((wx.screens[id] ?? on) ? ' on' : '')); chk.type = 'button'; chk.addEventListener('click', () => { const cur = wx.screens[id] ?? on; wx.screens[id] = !cur; chk.classList.toggle('on', !cur); }); grid.append(chk, el('span', 'pname', name)); }); body.appendChild(grid);
+      body.appendChild(opt2('Speed', [[0.5, 'Slow'], [0.75, '¾'], [1, 'Normal'], [1.5, 'Fast'], [2, 'Fastest']], wx.speed, (v) => { wx.speed = v; }));
+      body.appendChild(opt2('Scan lines', [[false, 'Off'], [true, 'CRT look']], wx.scanLines, (v) => { wx.scanLines = v; }));
+    } else if (step === 6) {
       body.appendChild(el('p', 'lead', 'Review and save. The page reloads with the new settings.'));
       const pre = el('pre', 'preview', JSON.stringify(exportable(), null, 2)); body.appendChild(pre);
       body.appendChild(el('small', 'hint', 'Saved to config.js on the server when this install can write it (hosted with PHP, or tools/serve.py). Otherwise it is kept in this browser and you can download config.js to place next to app.html.'));

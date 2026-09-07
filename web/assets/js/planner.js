@@ -1,7 +1,8 @@
 // Family Central Command — vanilla canvas build (no framework).
 import * as store from './store.js';
 import { Calendars } from './calendars.js';
-import { currentConditions } from './wx.js';
+import { currentConditions, resolveProvider, weatherStarUrl } from './wx.js';
+import { mountCard, openMeteoConditions } from './wx-card.js';
 import { loadConfig, isConfigured } from './config-loader.js';
 import { openSetup } from './setup.js';
 import { loadDisplay, applyLayout, applyTheme, startDim, openDisplaySettings } from './display.js';
@@ -71,25 +72,25 @@ $('btn-full').addEventListener('click', () => {
   if (!document.fullscreenElement) document.documentElement.requestFullscreen?.(); else document.exitFullscreen?.();
 });
 
-/* ---------- outside temp (NWS) ---------- */
+/* ---------- weather: WeatherStar 4000+ (NWS coverage) or the Open-Meteo card; header temp ---------- */
+let wxProvider = 'none';
 async function refreshWx() {
   try {
-    const w = await currentConditions(config.location);
-    $('hdr-temp').textContent = display.units === 'metric' ? Math.round((w.tempF - 32) * 5 / 9) : w.tempF;
+    const w = wxProvider === 'card' ? await openMeteoConditions(config.location, display.units) : await currentConditions(config.location);
+    $('hdr-temp').textContent = wxProvider === 'card' ? w.temp : (display.units === 'metric' ? Math.round((w.tempF - 32) * 5 / 9) : w.tempF);
     document.querySelector('.lcd.temp .unit').textContent = display.units === 'metric' ? '°C' : '°F';
     $('hdr-cond').textContent = w.cond;
     led('led-wx', 'on');
-  } catch (e) { console.warn('NWS:', e); led('led-wx', 'warn'); }
+  } catch (e) { console.warn('weather:', e); led('led-wx', 'warn'); }
 }
-if (config.location.lat == null) { led('led-wx', 'warn'); $('wx-frame').removeAttribute('src'); }
-else refreshWx();
-setInterval(refreshWx, 10 * 60 * 1000);
-
-/* ---------- WeatherStar 4000+ (clean upstream ws4kp build, kiosk mode) ---------- */
-if (config.location.lat != null) {
-  const latLon = encodeURIComponent(JSON.stringify({ lat: config.location.lat, lon: config.location.lon }));
-  $('wx-frame').src = `ws4kp/index.html?settings-kiosk-checkbox=true&settings-units-select=${display.units}&latLon=${latLon}&v=6`;
-}
+(async () => {
+  if (config.location.lat == null) { led('led-wx', 'warn'); $('wx-frame').removeAttribute('src'); return; }
+  wxProvider = await resolveProvider(config.weather, config.location);
+  const bezel = document.querySelector('#p-wx .bezel');
+  if (wxProvider === 'card') { mountCard(bezel, config.location, config.location.label, display.units); $('led-wx-label').textContent = 'OPEN-METEO'; document.querySelector('#p-wx .tbar h2').textContent = 'Weather'; }
+  else { $('wx-frame').src = weatherStarUrl(config.location, config.weather, display.units); }
+  refreshWx(); setInterval(refreshWx, 10 * 60 * 1000);
+})();
 
 /* ---------- check lists: shopping + notes ---------- */
 function bindList(name, formId, inputId, listId, countId) {

@@ -36,3 +36,28 @@ export async function currentConditions({ lat, lon }) {
   const tempF = Math.round(c * 9 / 5 + 32);
   return { tempF, cond: (p.textDescription || '').toUpperCase(), station: id };
 }
+
+export const WS_SCREENS = [
+  ['hazards', 'Hazards', true], ['current-weather', 'Current Conditions', true], ['latest-observations', 'Latest Observations', true],
+  ['hourly', 'Hourly Forecast', false], ['hourly-graph', 'Hourly Graph', true], ['travel', 'Travel Forecast', false],
+  ['regional-forecast', 'Regional Observations', true], ['local-forecast', 'Local Forecast', true], ['extended-forecast', 'Extended Forecast', true],
+  ['almanac', 'Almanac', true], ['spc-outlook', 'SPC Outlook', true], ['radar', 'Local Radar', true],
+];
+export const DEFAULT_WEATHER = { provider: 'auto', screens: Object.fromEntries(WS_SCREENS.map(([id, , on]) => [id, on])), speed: 1, scanLines: false };
+
+/* 'auto' → WeatherStar when the NWS covers the location (cached), else the Open-Meteo card. */
+export async function resolveProvider(weather, loc) {
+  const p = weather?.provider || 'auto';
+  if (p !== 'auto') return p;
+  if (loc.lat == null) return 'card';
+  const key = `fp.wx.nws.${loc.lat},${loc.lon}`; const cached = localStorage.getItem(key);
+  if (cached) return cached === 'ok' ? 'weatherstar' : 'card';
+  try { await lookupPoint(loc.lat, loc.lon); localStorage.setItem(key, 'ok'); return 'weatherstar'; }
+  catch { localStorage.setItem(key, 'no'); return 'card'; }
+}
+export function weatherStarUrl(loc, weather, units) {
+  const latLon = encodeURIComponent(JSON.stringify({ lat: loc.lat, lon: loc.lon }));
+  const p = new URLSearchParams({ 'settings-kiosk-checkbox': 'true', 'settings-units-select': units || 'us', 'settings-speed-select': String(weather?.speed ?? 1), 'settings-scanLines-checkbox': String(!!weather?.scanLines) });
+  WS_SCREENS.forEach(([id, , on]) => p.set(`${id}-checkbox`, String(weather?.screens?.[id] ?? on)));
+  return `ws4kp/index.html?${p.toString()}&latLon=${latLon}&v=7`;
+}

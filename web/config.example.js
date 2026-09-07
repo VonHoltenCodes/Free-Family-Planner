@@ -33,4 +33,10 @@ export default {
     { type: 'local', name: 'Family', color: '#2bff66' },
     // { type: 'ics', name: 'School', url: 'https://example.org/calendar.ics', color: '#c98bdb' },
   ],
+  // Weather panel. provider: 'auto' (WeatherStar 4000+ where the US National Weather Service has
+  // data, otherwise an Open-Meteo conditions card), or force 'weatherstar' / 'card'.
+  // screens: which WeatherStar screens rotate (ids: hazards, current-weather, latest-observations,
+  // hourly, hourly-graph, travel, regional-forecast, local-forecast, extended-forecast, almanac,
+  // spc-outlook, radar). speed: 0.5–2. scanLines: CRT look.
+  weather: { provider: 'auto', screens: { hourly: false, travel: false }, speed: 1, scanLines: false },
 };

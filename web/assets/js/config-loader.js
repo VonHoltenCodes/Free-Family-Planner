@@ -9,6 +9,7 @@ export const DEFAULTS = {
   googleClientId: '',
   holidayCalendarId: 'en.usa#holiday@group.v.calendar.google.com',
   calendars: [{ type: 'local', name: 'Family', color: '#2bff66' }],
+  weather: { provider: 'auto', screens: {}, speed: 1, scanLines: false },
 };
 export const LS_KEY = 'fp.config';
 
