@@ -145,9 +145,15 @@ tools/build-ws4kp.sh
 deploy.sh, deploy.env.example
 ```
 
+## Accessibility
+Keyboard-navigable (Tab through panels, Enter/Space on days and events), screen-reader landmarks and
+switch states, visible focus rings, `prefers-reduced-motion` support, and touch-sized targets on the
+wall display. When the on-screen keyboard opens, the page slides the focused field into view instead
+of shrinking the whole layout.
+
 ## Roadmap
-See [ROADMAP.md](ROADMAP.md) — setup menu, in-app configuration, themes, more calendar and data
-backends, kiosk install guides. Work happens on `feat/*` branches with a draft PR per feature.
+See [ROADMAP.md](ROADMAP.md) — the first roadmap is complete. New ideas go in Issues; work happens
+on `feat/*` branches with a PR per feature.
 
 ## Credits
 - [WeatherStar 4000+ (ws4kp)](https://github.com/netbymatt/ws4kp) by Matt Walsh — MIT.

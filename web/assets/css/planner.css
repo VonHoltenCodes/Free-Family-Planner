@@ -450,3 +450,23 @@ select option{background:var(--panel);color:var(--text);}
 .wx-pp{font:700 18px var(--font-ws);color:#8fb4ff;text-shadow:2px 2px 0 #000;}
 .canvas:not(.portrait) .wx-temp{font-size:72px;}
 .canvas:not(.portrait) .wx-icon{width:90px;height:90px;}
+
+/* ---------- touch & accessibility ---------- */
+:focus-visible{outline:2px solid var(--cyan);outline-offset:2px;}
+.cal-grid .day:focus-visible,.wday:focus-visible,.evt:focus-visible{outline-offset:-2px;}
+.checklist .del{min-width:32px;min-height:32px;display:inline-flex;align-items:center;justify-content:center;}
+.meal .mh .clr{min-width:28px;min-height:24px;}
+.canvas.portrait .btn{min-height:36px;}
+.canvas.portrait .btn.sm{min-height:32px;}
+.canvas.portrait .chk{width:28px;height:28px;}
+.canvas.portrait .chk::after{left:8px;top:8px;}
+.canvas.portrait .checklist li{padding:6px 8px;}
+.canvas.portrait .cal-grid .day{min-height:44px;}
+.canvas.portrait .week-add-btn,.canvas.portrait .dp-foot .btn{min-height:40px;}
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;}
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{transition:none!important;animation:none!important;scroll-behavior:auto!important;}
+  .lcd{text-shadow:none;}
+}
+/* keyboard mode: the canvas is shifted, not shrunk, while a field has focus (see keyboardGuard in planner.js) */
+.canvas.kbd{transition:transform .15s ease-out;}

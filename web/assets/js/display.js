@@ -117,7 +117,7 @@ export function openDisplaySettings(d, onChange) {
   const list = el('div', 'panel-list'); body.appendChild(list);
   const draw = () => { list.innerHTML = ''; d.order.forEach((k, i) => {
     const row = el('div', 'panel-row');
-    const chk = el('button', 'chk' + (d.hidden.includes(k) ? '' : ' on')); chk.type = 'button'; chk.addEventListener('click', () => { d.hidden = d.hidden.includes(k) ? d.hidden.filter((h) => h !== k) : [...d.hidden, k]; draw(); commit(); });
+    const chk = el('button', 'chk' + (d.hidden.includes(k) ? '' : ' on')); chk.type = 'button'; chk.setAttribute('role', 'switch'); chk.setAttribute('aria-checked', String(!d.hidden.includes(k))); chk.setAttribute('aria-label', `Show ${PANELS[k].name}`); chk.addEventListener('click', () => { d.hidden = d.hidden.includes(k) ? d.hidden.filter((h) => h !== k) : [...d.hidden, k]; draw(); commit(); });
     const up = el('button', 'btn sm', '▲'); up.type = 'button'; up.disabled = i === 0; up.addEventListener('click', () => { [d.order[i - 1], d.order[i]] = [d.order[i], d.order[i - 1]]; draw(); commit(); });
     const dn = el('button', 'btn sm', '▼'); dn.type = 'button'; dn.disabled = i === d.order.length - 1; dn.addEventListener('click', () => { [d.order[i + 1], d.order[i]] = [d.order[i], d.order[i + 1]]; draw(); commit(); });
     row.append(chk, el('span', 'pname', PANELS[k].name), el('span', 'grow'), up, dn); list.appendChild(row); }); };

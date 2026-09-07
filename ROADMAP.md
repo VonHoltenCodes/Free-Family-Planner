@@ -1,9 +1,7 @@
 # Roadmap
 
-Free Family Planner ships today as a working wall display with Google Calendar, Firestore
-lists and WeatherStar 4000+. Configuration is still a hand-edited `config.js`. These are the
-next steps, roughly in order. Each has (or will get) a `feat/<name>` branch and a draft PR;
-discussion lives in the linked issue.
+The first roadmap is complete (everything below is merged). New ideas go in Issues; each feature
+still gets a `feat/<name>` branch and a PR.
 
 | Feature | Branch | What it means |
 |---|---|---|
@@ -14,6 +12,6 @@ discussion lives in the linked issue.
 | **Calendar providers** ✅ | `feat/calendar-providers` | Google + any number of read-only **iCal/ICS feeds** (fetched through a session-gated proxy on either server type; recurrence, exclusions, all-day handled) + a writable **local family calendar** stored in the data backend. All shown together, colour-coded. CalDAV deferred. |
 | **Data backends** ✅ | `feat/data-backends` | `store.js` is a facade over three backends: Firestore, **self-hosted sync store** (a locked JSON file served by `api/db.php` or `tools/serve.py`, polled every 3 s — no cloud account), and browser-local. Chosen in the ⚙ wizard's Data step. |
 | **Weather options** ✅ | `feat/weather-options` | Wizard Weather step: pick which WeatherStar screens rotate, speed, scan lines; provider Auto/WeatherStar/card. Outside NWS coverage the panel becomes an **Open-Meteo conditions + 5-day card** in the Star4000 look (auto-detected, worldwide). °C/°F follow the display setting. |
-| **Touch & accessibility** | `feat/touch-a11y` | Bigger hit targets for kids, on-screen keyboard friendliness, screen-reader labels, reduced-motion. |
+| **Touch & accessibility** ✅ | `feat/touch-a11y` | Bigger hit targets in portrait, keyboard focus rings and Enter/Space on grid cells and event cards, ARIA regions/switches/dialog/live toast, `prefers-reduced-motion`, and an on-screen-keyboard guard that slides the canvas instead of re-scaling it. |
 
 Not planned: accounts, ads, or any hosted service. The whole point is that you own the box it runs on.
