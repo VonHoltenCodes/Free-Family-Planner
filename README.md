@@ -18,7 +18,7 @@ Retro hi-fi styling: beveled panels, LCD readouts, pixel headings, and a real We
 
 | Piece | Backed by | Notes |
 |---|---|---|
-| Calendar, week ahead, add/edit/delete events | Google Calendar API (OAuth in the browser) | pick any of your calendars; US holidays overlaid |
+| Calendar, week ahead, add/edit/delete events | a **local family calendar** (no account), any **iCal/ICS feeds** (school, sports, iCloud, Outlook — read-only), and/or **Google Calendar** (OAuth in the browser) | all shown together, colour-coded; US holidays overlaid with Google |
 | Shopping list, notes, meals, chores | your choice: **self-hosted sync store** (no cloud), Firebase Firestore, or this-device-only | edits sync between the wall and your phone in the first two |
 | WeatherStar 4000+ | bundled ws4kp 6.2.6 in kiosk mode | National Weather Service data, no API key |
 | Outside temp in the header | api.weather.gov | no API key |
@@ -44,7 +44,12 @@ Everything runs in the browser. There are two ways to run it:
   `notes`, `shopping`, `events`, and the documents `settings/weeklyMeals`, `chores/<kidId>`.
 - **This device only**: everything in the browser's storage. Zero setup, no sync.
 
-### 2. Google Calendar (OAuth)
+### 2. Calendars
+The wizard's Calendars step: the local family calendar is on by default; add iCal/ICS feed URLs
+(iCloud public calendar, Google "secret address in iCal format", Outlook publish, school/sports
+"subscribe" links — use `https://`, not `webcal://`); Google is optional.
+
+#### Google Calendar (optional, OAuth)
 1. In Google Cloud Console, enable the **Google Calendar API**.
 2. Create an **OAuth 2.0 Client ID** of type *Web application*; add your site origin
    (e.g. `https://example.com`) to *Authorized JavaScript origins*.

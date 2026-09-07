@@ -197,6 +197,8 @@ select option{background:var(--panel);color:var(--text);}
 .gstate{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;color:var(--text-dim);font-size:15px;text-align:center;padding:10px;}
 .gstate .err{color:var(--red);font-size:13px;}
 .gstate.fatal{padding:20px;}
+.gstate.compact{flex:none;flex-direction:row;justify-content:flex-start;gap:10px;padding:6px 8px;font-size:13px;background:var(--panel-2);border:1px dashed var(--grid-line-2);border-radius:3px;margin-bottom:4px;}
+.dlg select{background:var(--well);color:var(--text-strong);padding:7px 10px;border-radius:3px;font-size:15px;border:1px solid #44444e;color-scheme:dark;}
 
 /* ---------- weather: WeatherStar in an EasyAmp monitor bezel ---------- */
 .panel.wx > .tbar h2{font-family:var(--font-ws);font-size:17px;letter-spacing:.12em;color:var(--wx-title);text-shadow:2px 2px 0 #000;}
