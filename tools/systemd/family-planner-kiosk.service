@@ -1,0 +1,20 @@
+# Optional: boot a Raspberry Pi (or any Linux box with a desktop session) straight into the planner
+# in Chromium kiosk mode. Pair with family-planner.service on the same machine, or point the URL
+# at another box running the server. See docs/kiosk/raspberry-pi.md.
+[Unit]
+Description=Free Family Planner kiosk (Chromium)
+After=graphical.target family-planner.service
+Wants=family-planner.service
+
+[Service]
+User=pi
+Environment=DISPLAY=:0
+Environment=XDG_RUNTIME_DIR=/run/user/1000
+ExecStartPre=/bin/sh -c 'until curl -sf http://localhost:8765/ >/dev/null; do sleep 2; done'
+ExecStart=/usr/bin/chromium-browser --kiosk --noerrdialogs --disable-infobars --disable-session-crashed-bubble \
+  --overscroll-history-navigation=0 --check-for-update-interval=31536000 http://localhost:8765/
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=graphical.target
