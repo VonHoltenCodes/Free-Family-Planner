@@ -10,9 +10,12 @@ tools/serve.py already runs the planner with no web host and no login page. Fini
 - Document the Google OAuth origin rule (localhost or https only) and the https-on-LAN options
 
 ## Design notes
-_(to be filled in as the feature takes shape)_
+- The image serves `web/` with `tools/serve.py`; `config.js` is bind-mounted so the image stays generic.
+- No login gate in local mode by design (trusted LAN). Hosted mode keeps the PHP gate.
+- Google OAuth origin rule (localhost or https) is the one real limitation of LAN hosting; documented in every guide.
 
 ## Checklist
-- [ ] design agreed in #1
-- [ ] implementation
-- [ ] README / ROADMAP updated
+- [x] Dockerfile (multi-stage: builds ws4kp) + docker-compose.yml
+- [x] systemd units: server + Chromium kiosk
+- [x] docs/kiosk: Android/Fire tablet, Raspberry Pi, Docker
+- [x] README / ROADMAP updated

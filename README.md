@@ -69,9 +69,12 @@ from a subfolder. If you keep your own ws4kp clone, point `WS4KP_REPO` at it to 
 python3 tools/serve.py                # opens http://localhost:8765/
 python3 tools/serve.py --host 0.0.0.0 # reachable from other devices on your LAN
 ```
+Or with Docker (builds the WeatherStar bundle for you): `docker compose up -d`.
 Skip `auth_config.php` for this mode — there is no login gate. Google OAuth only trusts
 `http://localhost` or an `https://` origin, so sign in to Calendar on the display device
 itself via localhost (Firestore, WeatherStar and the NWS temp work from any origin).
+Step-by-step guides for an Android/Fire tablet, a Raspberry Pi kiosk and Docker on a home
+server are in [docs/kiosk/](docs/kiosk/README.md); a systemd unit is in `tools/systemd/`.
 
 ### 5b. Or deploy to a web host
 Upload the `web/` folder to your host, or use the rsync helper:
