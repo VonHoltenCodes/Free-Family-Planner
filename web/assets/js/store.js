@@ -1,17 +1,27 @@
 // Firestore data layer. Collections: notes, shopping; docs: settings/weeklyMeals, chores/<kidId>.
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js';
 import {
-  getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy, setDoc,
+  getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy, setDoc, getDoc,
 } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 
-import config from '../../config.js';
-
-const firebaseConfig = config.firebase;
-
-export const configured = !!(firebaseConfig && firebaseConfig.apiKey && firebaseConfig.projectId);
 let db = null;
-if (configured) { db = getFirestore(initializeApp(firebaseConfig)); }
-else { console.warn('Firebase not configured in config.js — lists, meals and chores are disabled'); }
+export let configured = false;
+
+/* Call once with config.firebase before using anything else. */
+export function initStore(firebaseConfig) {
+  configured = !!(firebaseConfig && firebaseConfig.apiKey && firebaseConfig.projectId);
+  if (configured) db = getFirestore(initializeApp(firebaseConfig));
+  else console.warn('Firebase not configured — lists, meals and chores are disabled');
+  return configured;
+}
+
+/* Setup-wizard connectivity check: initialise a throwaway app and read one doc. */
+export async function testFirebase(firebaseConfig) {
+  const app = initializeApp(firebaseConfig, `test-${Date.now()}`);
+  const d = await getDoc(doc(getFirestore(app), 'settings', 'weeklyMeals'));
+  return d.exists() ? 'connected — existing meal plan found' : 'connected — empty project (fine for a fresh start)';
+}
+
 const notConfigured = () => Promise.reject(new Error('Firebase not configured'));
 
 /* Simple check lists: `notes` and `shopping` collections ({text, completed, createdAt}). */

@@ -313,3 +313,34 @@ select option{background:var(--panel);color:var(--text);}
 .canvas.portrait .status{gap:10px;font-size:10px;letter-spacing:1px;}
 .canvas.portrait .status .pill.b{width:40px;}
 .canvas.portrait .dlg{width:640px;}
+
+/* ---------- ⚙ setup wizard ---------- */
+.dlg.setup{width:760px;max-height:1000px;display:flex;flex-direction:column;}
+.dlg.setup .form{overflow-y:auto;min-height:0;}
+.dlg .steps{display:flex;gap:2px;padding:6px 8px 0;background:var(--panel-2);border-bottom:1px solid var(--grid-line-2);}
+.dlg .step{font-family:var(--font-pixel);font-size:12px;letter-spacing:1px;padding:6px 10px;color:var(--text-dim);border-radius:3px 3px 0 0;background:transparent;}
+.dlg .step.done{color:var(--grn);}
+.dlg .step.on{background:var(--panel);color:var(--amber);box-shadow:inset 0 2px 0 var(--amber);}
+.dlg .lead{font-size:15px;color:var(--text);line-height:1.35;}
+.dlg .hint{font-family:var(--font-body);font-size:12px;color:var(--text-dim);text-transform:none;letter-spacing:0;line-height:1.3;}
+.dlg .hint.bad{color:var(--red);}
+.dlg .row-inline{display:flex;gap:6px;}
+.dlg .row-inline input{flex:1;}
+.dlg .geo-results{display:flex;flex-wrap:wrap;gap:6px;}
+.dlg .btn.geo{text-transform:none;letter-spacing:0;font-family:var(--font-body);font-size:13px;}
+.dlg .kid-list{display:flex;flex-direction:column;gap:6px;}
+.dlg .kid-row{display:flex;gap:8px;align-items:center;}
+.dlg .kid-row input[type=text]{flex:1;}
+.dlg input[type=color]{width:44px;height:34px;padding:0;border:1px solid #44444e;border-radius:3px;background:var(--well);}
+.dlg .kv{display:grid;grid-template-columns:150px 1fr;gap:6px 10px;align-items:center;}
+.dlg .kv .k{font-family:var(--font-pixel);font-size:11px;letter-spacing:1px;color:var(--text-dim);}
+.dlg .test-row{display:flex;align-items:center;gap:10px;}
+.dlg .test-out{font-size:13px;color:var(--text-dim);}
+.dlg .test-out.ok{color:var(--grn);}
+.dlg .test-out.bad{color:var(--red);}
+.dlg .preview{background:var(--well);color:var(--text);font:12px/1.35 var(--font-mono,monospace);padding:10px;border-radius:3px;max-height:420px;overflow:auto;border:1px solid var(--grid-line-2);white-space:pre-wrap;}
+.dlg .note{font-family:var(--font-pixel);font-size:12px;letter-spacing:1px;color:var(--text-dim);align-self:center;}
+.dlg .note.ok{color:var(--grn);}
+.dlg .note.warn{color:var(--amber);}
+.dlg .note.bad{color:var(--red);}
+.canvas.portrait .dlg.setup{width:900px;max-height:1500px;}
