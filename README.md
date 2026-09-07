@@ -101,8 +101,14 @@ cd web && python3 -m http.server 8765 --bind 127.0.0.1   # open http://127.0.0.1
 ```
 Firestore, NWS and WeatherStar work locally; Google sign-in only works on an authorized origin.
 
+## Display settings
+The **☰ Display** button (status bar) opens per-screen settings saved in that browser: show/hide
+and reorder panels, chores per kid, week start, 12/24-hour clock, °F/°C, force portrait or
+landscape, and a night-dim schedule (any touch wakes the screen for a minute). Different screens in
+the house can be arranged differently.
+
 ## Layout
-Portrait, top to bottom: header (date · outside temp · clock) → calendar month grid with a
+Portrait, top to bottom (default order — change it in ☰ Display): header (date · outside temp · clock) → calendar month grid with a
 day pane → WeatherStar beside the shopping list → week ahead → meal plan → chores beside notes
 → status bar (Firestore / Google Calendar / NWS LEDs, sign-out). Landscape re-flows the same
 panels into two columns. Both grids live in `web/assets/css/planner.css`; the canvas scaler is

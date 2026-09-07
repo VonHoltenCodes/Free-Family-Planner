@@ -288,15 +288,8 @@ select option{background:var(--panel);color:var(--text);}
 .canvas.portrait .lcd.temp{font-size:22px;}
 .canvas.portrait .rack .wxword{max-width:80px;font-size:10px;}
 
-.canvas.portrait .main{grid-template-columns:690px 1fr;grid-template-rows:1fr 548px 200px 176px 236px;}
-.canvas.portrait .col,.canvas.portrait .row.bottom{display:contents;}
-.canvas.portrait #p-cal{grid-column:1/3;grid-row:1;}
-.canvas.portrait #p-wx{grid-column:1;grid-row:2;}
-.canvas.portrait #p-shop{grid-column:2;grid-row:2;}
-.canvas.portrait #p-week{grid-column:1/3;grid-row:3;}
-.canvas.portrait #p-meals{grid-column:1/3;grid-row:4;}
-.canvas.portrait #p-chores{grid-column:1;grid-row:5;}
-.canvas.portrait #p-notes{grid-column:2;grid-row:5;}
+.canvas.portrait .main{grid-template-columns:690px 1fr;}   /* rows + placements are computed by display.js applyLayout() */
+.canvas.portrait .col,.canvas.portrait .row.bottom{display:contents!important;}
 
 .canvas.portrait .cal-wrap{grid-template-columns:1fr 340px;}
 .canvas.portrait .cal-grid .day .num{font-size:12px;}
@@ -344,3 +337,15 @@ select option{background:var(--panel);color:var(--text);}
 .dlg .note.warn{color:var(--amber);}
 .dlg .note.bad{color:var(--red);}
 .canvas.portrait .dlg.setup{width:900px;max-height:1500px;}
+
+/* ---------- display settings ---------- */
+.dlg .sect{font-family:var(--font-pixel);font-size:12px;letter-spacing:2px;color:var(--amber);text-transform:uppercase;padding-top:6px;border-top:1px solid var(--grid-line);}
+.dlg .panel-list{display:flex;flex-direction:column;gap:4px;}
+.dlg .panel-row{display:flex;align-items:center;gap:10px;padding:4px 6px;background:var(--panel-2);border:1px solid var(--grid-line);border-radius:3px;}
+.dlg .panel-row .pname{font-size:15px;}
+.dlg .panel-row .grow{flex:1;}
+.dlg .opt{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.dlg .opt .k{font-family:var(--font-pixel);font-size:11px;letter-spacing:1px;color:var(--text-dim);min-width:130px;}
+.dlg .seg{display:flex;gap:4px;}
+.dim{position:absolute;inset:0;z-index:90;background:#000;pointer-events:none;transition:opacity .6s;}
+.dim[hidden]{display:none;}
