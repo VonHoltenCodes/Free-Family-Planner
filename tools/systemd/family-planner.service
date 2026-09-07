@@ -1,0 +1,20 @@
+# Free Family Planner — local-host server as a systemd unit (no Docker).
+# Install:
+#   sudo cp tools/systemd/family-planner.service /etc/systemd/system/
+#   sudo systemctl daemon-reload && sudo systemctl enable --now family-planner
+# Edit WorkingDirectory / User to match where you cloned the repo.
+[Unit]
+Description=Free Family Planner (local-host server)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/Free-Family-Planner
+ExecStart=/usr/bin/python3 tools/serve.py --host 0.0.0.0 --port 8765 --no-open
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

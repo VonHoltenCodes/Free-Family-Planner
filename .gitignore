@@ -4,6 +4,9 @@ web/ws4kp/
 web/config.js
 web/includes/auth_config.php
 deploy.env
+# self-hosted sync store
+data/
+web/includes/data/
 # local scratch
 reference/
 *.log

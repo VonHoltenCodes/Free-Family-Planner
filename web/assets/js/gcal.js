@@ -1,18 +1,16 @@
 // Google Calendar via gapi + Google Identity Services (token client).
-import config from '../../config.js';
-
-const CLIENT_ID = config.googleClientId;
 const SCOPES = 'https://www.googleapis.com/auth/calendar';
-const HOLIDAY_CALENDAR_ID = config.holidayCalendarId || 'en.usa#holiday@group.v.calendar.google.com';
 
-const loadScript = (src) => new Promise((resolve, reject) => {
+export const loadScript = (src) => new Promise((resolve, reject) => {
   const s = document.createElement('script');
   s.src = src; s.async = true; s.onload = resolve; s.onerror = () => reject(new Error(`failed to load ${src}`));
   document.head.appendChild(s);
 });
 
 export class GCal {
-  constructor() {
+  constructor({ clientId, holidayCalendarId } = {}) {
+    this.clientId = clientId;
+    this.holidayCalendarId = holidayCalendarId || 'en.usa#holiday@group.v.calendar.google.com';
     this.ready = false;
     this.signedIn = false;
     this.calendarId = 'primary';
@@ -28,7 +26,7 @@ export class GCal {
     await window.gapi.client.init({});
     await window.gapi.client.load('calendar', 'v3');
     this.tokenClient = window.google.accounts.oauth2.initTokenClient({
-      client_id: CLIENT_ID,
+      client_id: this.clientId,
       scope: SCOPES,
       callback: (resp) => {
         if (resp.error) { this.signedIn = false; this.onAuthChange(false, resp.error); return; }
@@ -78,7 +76,7 @@ export class GCal {
   async listHolidays() {
     try {
       const r = await window.gapi.client.calendar.events.list({
-        calendarId: HOLIDAY_CALENDAR_ID, ...GCal.window(), showDeleted: false, singleEvents: true, maxResults: 50, orderBy: 'startTime',
+        calendarId: this.holidayCalendarId, ...GCal.window(), showDeleted: false, singleEvents: true, maxResults: 50, orderBy: 'startTime',
       });
       return r.result.items || [];
     } catch (e) { console.log('holidays unavailable:', e); return []; }

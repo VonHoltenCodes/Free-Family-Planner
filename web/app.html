@@ -7,7 +7,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <title>Family Planner</title>
 <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="assets/css/planner.css?v=5">
+<link rel="stylesheet" href="assets/css/planner.css?v=11">
 </head>
 <body>
 <div class="scaler">
@@ -99,10 +99,10 @@
     <div class="pills"><span class="pill o"></span><span class="pill m"></span><span class="pill b"></span></div>
     <span class="footer-text" id="status-footer"></span>
     <span class="grow"></span>
-    <span class="svc"><span class="led" id="led-fb"></span>FIRESTORE</span>
+    <span class="svc"><span class="led" id="led-fb"></span><span id="led-fb-label">DATA</span></span>
     <span class="svc"><span class="led" id="led-gc"></span>GOOGLE CAL</span>
     <span class="svc"><span class="led" id="led-wx"></span>NWS</span>
-    <span class="sep">•</span><a href="logout.php">SIGN OUT</a>
+    <button class="btn sm" id="btn-display" title="Display settings">☰ DISPLAY</button><button class="btn sm" id="btn-setup" title="Setup">⚙ SETUP</button><span class="sep">•</span><a href="logout.php">SIGN OUT</a>
   </footer>
 
   <!-- event modal -->
@@ -110,6 +110,7 @@
     <form class="dlg" id="evt-form">
       <div class="tbar"><h3 id="evt-title">New Event</h3><span class="grow"></span><button type="button" class="x" id="evt-close">×</button></div>
       <div class="form">
+        <label id="ev-target-wrap" hidden>Calendar<select id="ev-target"></select></label>
         <label>Title<input type="text" id="ev-summary" required autocomplete="off"></label>
         <label class="inline"><span class="chk" id="ev-allday" role="checkbox" aria-checked="false" tabindex="0"></span>All day</label>
         <div class="row2"><label>Start date<input type="date" id="ev-sdate" required></label><label class="timed">Start time<input type="time" id="ev-stime"></label></div>
@@ -129,6 +130,6 @@
 </div>
 </div>
 
-<script type="module" src="assets/js/planner.js?v=5"></script>
+<script type="module" src="assets/js/planner.js?v=10"></script>
 </body>
 </html>
