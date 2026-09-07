@@ -12,6 +12,7 @@ or put a LAN hostname behind https. Firestore, WeatherStar and NWS work from any
 """
 import argparse, functools, http.server, json, os, re, shutil, sys, threading, webbrowser
 from urllib.parse import urlsplit, parse_qs
+import urllib.request
 
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'web')
 DATA_DIR = os.environ.get('FP_DATA_DIR') or os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'data')
@@ -59,8 +60,21 @@ class Handler(http.server.SimpleHTTPRequestHandler):
     def do_PUT(self): return self._db() if self.path.startswith('/api/db.php') else self.send_error(404)
     def do_DELETE(self): return self._db() if self.path.startswith('/api/db.php') else self.send_error(404)
 
+    def _ics_proxy(self):
+        # ICS feed proxy: only URLs present in web/config.js are allowed (no open proxy)
+        url = parse_qs(urlsplit(self.path).query).get('url', [''])[0]
+        try: cfg = open(os.path.join(ROOT, 'config.js')).read()
+        except OSError: cfg = ''
+        if not re.match(r'https?://', url) or json.dumps(url) not in cfg and f"'{url}'" not in cfg: return self.send_error(403, 'feed not in config')
+        try:
+            with urllib.request.urlopen(urllib.request.Request(url, headers={'User-Agent': 'FreeFamilyPlanner/1.0'}), timeout=15) as r: body = r.read()
+        except Exception as e:  # noqa: BLE001
+            return self.send_error(502, f'fetch failed: {e}')
+        self.send_response(200); self.send_header('Content-Type', 'text/calendar; charset=utf-8'); self.send_header('Content-Length', str(len(body))); self.end_headers(); self.wfile.write(body)
+
     def do_GET(self):
         if self.path.startswith('/api/db.php'): return self._db()
+        if self.path.startswith('/api/ics.php'): return self._ics_proxy()
         if self.path in ('/', '/index.php', '/index.html'):
             self.path = '/app.html'
         if self.path.startswith('/includes/') or self.path.startswith('/api/'):

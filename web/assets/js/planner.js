@@ -1,6 +1,6 @@
 // Family Central Command — vanilla canvas build (no framework).
 import * as store from './store.js';
-import { GCal } from './gcal.js';
+import { Calendars } from './calendars.js';
 import { currentConditions } from './wx.js';
 import { loadConfig, isConfigured } from './config-loader.js';
 import { openSetup } from './setup.js';
@@ -178,9 +178,10 @@ const mealBoxes = {};
 }
 
 /* ---------- calendar ---------- */
-const gcal = new GCal({ clientId: config.googleClientId, holidayCalendarId: config.holidayCalendarId });
-let events = [];      // raw Google events (selected calendar)
-let holidays = [];    // raw holiday events
+const cal = new Calendars(config);
+const gcal = cal.google;   // null when Google is not configured
+let events = [];      // normalised events from every provider (Google shape: start.date | start.dateTime)
+let holidays = [];    // holiday events (read-only)
 let expanded = [];    // per-day rows {ev, key, isHoliday, multi}
 let viewYM = (() => { const n = new Date(); return { y: n.getFullYear(), m: n.getMonth() }; })();
 let selected = new Date();
@@ -230,7 +231,7 @@ function renderMonth() {
     const rows = eventsOn(key);
     if (rows.some((r) => r.isHoliday)) cell.classList.add('holiday');
     cell.appendChild(el('div', 'num', d.getDate()));
-    rows.slice(0, 3).forEach((r) => { const c = el('div', 'chip' + (r.isHoliday ? ' holiday' : ''), r.ev.summary || '(untitled)'); c.title = r.ev.summary || ''; cell.appendChild(c); });
+    rows.slice(0, 3).forEach((r) => { const c = el('div', 'chip' + (r.isHoliday ? ' holiday' : ''), r.ev.summary || '(untitled)'); c.title = (r.ev.calendarName ? `${r.ev.calendarName}: ` : '') + (r.ev.summary || ''); if (r.ev.color) c.style.borderLeftColor = r.ev.color; cell.appendChild(c); });
     if (rows.length > 3) cell.appendChild(el('div', 'chip more', `+${rows.length - 3} more`));
     cell.addEventListener('click', () => { selected = d; if (d.getMonth() !== viewYM.m) viewYM = { y: d.getFullYear(), m: d.getMonth() }; renderAll(); });
     grid.appendChild(cell);
@@ -241,14 +242,14 @@ function renderDay() {
   $('dp-dow').textContent = FULL[selected.getDay()].toUpperCase();
   $('dp-date').textContent = selected.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
   const list = $('dp-list'); list.innerHTML = '';
-  if (authMsg) { renderAuthPrompt(list); return; }
+  if (authMsg) renderAuthPrompt(list);
   const rows = eventsOn(dateKey(selected));
   if (!rows.length) { list.appendChild(el('div', 'empty', 'No events')); return; }
   rows.forEach((r) => {
     const card = el('div', 'evt' + (r.isHoliday ? ' holiday' : ''));
-    card.appendChild(el('div', 'when', r.isHoliday ? 'HOLIDAY' : fmtTime(r.ev)));
+    const when = el('div', 'when', r.isHoliday ? 'HOLIDAY' : fmtTime(r.ev)); if (r.ev.color && !r.isHoliday) when.style.background = r.ev.color; card.appendChild(when);
     const info = el('div', 'info'); info.appendChild(el('div', 'ttl', r.ev.summary || '(untitled)'));
-    const sub = [r.ev.location, r.multi ? 'Multi-day' : ''].filter(Boolean).join(' • '); if (sub) info.appendChild(el('div', 'loc', sub));
+    const sub = [r.ev.calendarName, r.ev.location, r.multi ? 'Multi-day' : ''].filter(Boolean).join(' • '); if (sub) info.appendChild(el('div', 'loc', sub));
     card.appendChild(info);
     if (!r.isHoliday) card.addEventListener('click', () => openModal(r.ev));
     list.appendChild(card);
@@ -263,8 +264,8 @@ function renderWeek() {
     const card = el('div', 'wday' + (i === 0 ? ' today' : '') + (key === selKey ? ' sel' : ''));
     const h = el('div', 'wh'); h.appendChild(el('span', 'dn', DOW[d.getDay()].toUpperCase())); h.appendChild(el('span', 'dd', d.getDate())); card.appendChild(h);
     const l = el('div', 'wl'); const rows = eventsOn(key);
-    if (!rows.length) l.appendChild(el('span', 'empty', authMsg ? '—' : 'No events'));
-    rows.slice(0, 3).forEach((r) => { const c = el('div', 'chip' + (r.isHoliday ? ' holiday' : ''), r.ev.summary || '(untitled)'); if (!r.isHoliday) c.addEventListener('click', (e) => { e.stopPropagation(); openModal(r.ev); }); l.appendChild(c); });
+    if (!rows.length) l.appendChild(el('span', 'empty', 'No events'));
+    rows.slice(0, 3).forEach((r) => { const c = el('div', 'chip' + (r.isHoliday ? ' holiday' : ''), r.ev.summary || '(untitled)'); if (r.ev.color) c.style.borderLeftColor = r.ev.color; if (!r.isHoliday) c.addEventListener('click', (e) => { e.stopPropagation(); openModal(r.ev); }); l.appendChild(c); });
     if (rows.length > 3) l.appendChild(el('div', 'chip more', `+${rows.length - 3}`));
     card.appendChild(l);
     card.addEventListener('click', () => { selected = d; viewYM = { y: d.getFullYear(), m: d.getMonth() }; renderAll(); });
@@ -274,43 +275,50 @@ function renderWeek() {
 function renderAll() { renderMonth(); renderDay(); renderWeek(); }
 
 async function loadEvents(showBusy = true) {
-  if (!gcal.signedIn) return;
   if (showBusy) $('cal-refresh').disabled = true;
   try {
-    if (!gcal.calendars.length) { await gcal.listCalendars(); renderCalSelect(); }
-    [events, holidays] = await Promise.all([gcal.listEvents(), gcal.listHolidays()]);
-    expandAll(); renderAll(); led('led-gc', 'on');
-    $('cal-sub').textContent = gcal.calendars.find((c) => c.id === gcal.calendarId)?.summary || 'Google Calendar';
+    if (gcal?.signedIn && !gcal.calendars.length) { await gcal.listCalendars(); renderCalSelect(); }
+    const all = await cal.loadAll();
+    events = all.filter((e) => !e.isHoliday); holidays = all.filter((e) => e.isHoliday);
+    expandAll(); renderAll();
+    const feedErr = Object.values(cal.status || {}).some((v) => typeof v === 'string');
+    led('led-gc', feedErr ? 'warn' : ((gcal?.signedIn || cal.ics.length || cal.local) ? 'on' : ''));
+    const parts = []; if (gcal?.signedIn) parts.push(gcal.calendars.find((c) => c.id === gcal.calendarId)?.summary || 'Google'); cal.ics.forEach((f) => parts.push(f.name)); if (cal.local) parts.push(cal.local.name);
+    $('cal-sub').textContent = parts.join(' + ') || 'No calendars';
+    setWriteUI();
   } catch (e) {
     console.error('calendar load:', e); led('led-gc', 'err');
     if (e.status === 401) { setAuthUI(false, 'Session expired — sign in again'); } else toast('Calendar load failed');
   } finally { $('cal-refresh').disabled = false; }
 }
+function setWriteUI() { const w = cal.writable().length > 0; $('cal-add').hidden = !w; $('dp-add').hidden = !w; }
+cal.onLocalChange = () => loadEvents(false);
 function renderCalSelect() {
   const sel = $('cal-select'); sel.innerHTML = '';
   gcal.calendars.forEach((c) => { const o = el('option', null, c.summary + (c.primary ? ' (Primary)' : '')); o.value = c.id; sel.appendChild(o); });
   sel.value = gcal.calendarId; sel.hidden = gcal.calendars.length < 2;
 }
 $('cal-select').addEventListener('change', (e) => { gcal.calendarId = e.target.value; loadEvents(); });
+$('cal-refresh').hidden = false;
 $('cal-refresh').addEventListener('click', () => loadEvents());
-$('cal-signout').addEventListener('click', () => gcal.signOut());
+$('cal-signout').addEventListener('click', () => gcal?.signOut());
 $('cal-prev').addEventListener('click', () => { viewYM.m--; if (viewYM.m < 0) { viewYM.m = 11; viewYM.y--; } renderMonth(); });
 $('cal-next').addEventListener('click', () => { viewYM.m++; if (viewYM.m > 11) { viewYM.m = 0; viewYM.y++; } renderMonth(); });
 $('cal-today').addEventListener('click', () => { const n = new Date(); selected = n; viewYM = { y: n.getFullYear(), m: n.getMonth() }; renderAll(); });
 $('cal-add').addEventListener('click', () => openModal(null));
 $('dp-add').addEventListener('click', () => openModal(null));
 
-let authMsg = null;   // null = signed in; otherwise {text, err?} shown in the day pane
+let authMsg = null;   // set while Google is configured but not signed in
 function setAuthUI(signedIn, msg) {
-  $('cal-signout').hidden = !signedIn; $('cal-add').hidden = !signedIn; $('cal-refresh').hidden = !signedIn; $('dp-add').hidden = !signedIn;
-  if (signedIn) { authMsg = null; }
-  else { authMsg = { text: 'Connect Google Calendar to see and manage family events', err: msg || '' }; events = []; holidays = []; expandAll(); led('led-gc', ''); $('cal-sub').textContent = 'Google Calendar'; }
-  renderAll();
+  $('cal-signout').hidden = !signedIn; $('cal-refresh').hidden = false;
+  if (signedIn || !cal.hasGoogle) { authMsg = null; }
+  else { authMsg = { text: 'Sign in to see your Google Calendar too', err: msg || '' }; led('led-gc', ''); }
+  setWriteUI(); loadEvents(false);
 }
 function renderAuthPrompt(list) {
-  const g = el('div', 'gstate');
+  const g = el('div', 'gstate compact');
   g.appendChild(el('div', null, authMsg.text));
-  const b = el('button', 'btn', 'Sign in with Google'); b.type = 'button'; b.addEventListener('click', () => gcal.requestToken(false)); g.appendChild(b);
+  const b = el('button', 'btn sm', 'Sign in with Google'); b.type = 'button'; b.addEventListener('click', () => gcal.requestToken(false)); g.appendChild(b);
   if (authMsg.err) g.appendChild(el('div', 'err', authMsg.err));
   list.appendChild(g);
 }
@@ -322,8 +330,13 @@ allday.addEventListener('click', () => setAllDay(!allday.classList.contains('on'
 allday.addEventListener('keydown', (e) => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); allday.click(); } });
 function openModal(ev) {
   editing = ev;
-  $('evt-title').textContent = ev ? 'Edit Event' : 'New Event';
-  $('ev-delete').hidden = !ev;
+  const ro = !!ev?.readOnly;
+  $('evt-title').textContent = ev ? (ro ? `${ev.calendarName || 'Feed'} event (read-only)` : 'Edit Event') : 'New Event';
+  $('ev-delete').hidden = !ev || ro; $('ev-save').hidden = ro;
+  document.querySelectorAll('#evt-form input, #evt-form textarea').forEach((i) => { i.disabled = ro; });
+  const targets = cal.writable(); const tw = $('ev-target-wrap'); const ts = $('ev-target');
+  tw.hidden = !!ev || targets.length < 2; ts.innerHTML = ''; targets.forEach((t) => { const o = el('option', null, t.name); o.value = t.id; ts.appendChild(o); });
+  if (!ev && targets.length) ts.value = targets[0].id;
   const k = dateKey(selected);
   if (!ev) { $('ev-summary').value = ''; $('ev-loc').value = ''; $('ev-desc').value = ''; $('ev-sdate').value = k; $('ev-edate').value = k; $('ev-stime').value = '09:00'; $('ev-etime').value = '10:00'; setAllDay(false); }
   else {
@@ -348,30 +361,27 @@ $('evt-form').addEventListener('submit', async (e) => {
     resource = { summary, description: $('ev-desc').value, location: $('ev-loc').value, start: { dateTime: s.toISOString(), timeZone: tz }, end: { dateTime: en.toISOString(), timeZone: tz } };
   }
   $('ev-save').disabled = true;
-  try { if (editing) await gcal.update(editing.id, resource); else await gcal.insert(resource); closeModal(); toast(editing ? 'Event updated' : 'Event added'); await loadEvents(false); }
+  try { if (editing) await cal.update(editing, resource); else await cal.insert($('ev-target').value || cal.writable()[0]?.id, resource); closeModal(); toast(editing ? 'Event updated' : 'Event added'); await loadEvents(false); }
   catch (err) { console.error(err); toast('Save failed'); }
   finally { $('ev-save').disabled = false; }
 });
 $('ev-delete').addEventListener('click', async () => {
   if (!editing || !window.confirm('Delete this event?')) return;
-  try { await gcal.remove(editing.id); closeModal(); toast('Event deleted'); await loadEvents(false); } catch (err) { console.error(err); toast('Delete failed'); }
+  try { await cal.remove(editing); closeModal(); toast('Event deleted'); await loadEvents(false); } catch (err) { console.error(err); toast('Delete failed'); }
 });
 window.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('evt-overlay').hidden) closeModal(); });
 
-/* boot calendar */
-authMsg = { text: 'Connecting to Google Calendar…', err: '' };
+/* boot calendars */
 renderAll();
 (async () => {
-  if (!config.googleClientId) { authMsg = { text: 'Google Calendar not configured', err: 'Set googleClientId in config.js' }; renderAll(); led('led-gc', 'warn'); return; }
+  if (!gcal) { setAuthUI(false); return; }
   try {
     await gcal.init();
-    gcal.onAuthChange = (ok, err) => { if (ok) { setAuthUI(true); loadEvents(); } else setAuthUI(false, err ? 'Sign-in failed' : ''); };
+    gcal.onAuthChange = (ok, err) => { setAuthUI(ok, err ? 'Sign-in failed' : ''); };
     setAuthUI(false);
-    // silent re-auth like the old build: works when this browser already granted access
-    try { gcal.requestToken(true); } catch (e) { console.log('silent auth unavailable'); }
+    try { gcal.requestToken(true); } catch (e) { console.log('silent auth unavailable'); }   // silent re-auth when this browser already granted access
   } catch (e) {
-    console.error('gapi init:', e); led('led-gc', 'err');
-    authMsg = { text: 'Google Calendar unavailable', err: `Google API failed to load: ${e.message}` }; renderAll();
+    console.error('gapi init:', e); led('led-gc', 'err'); authMsg = { text: 'Google Calendar unavailable', err: `Google API failed to load: ${e.message}` }; loadEvents(false);
   }
 })();
 onNewDay.push(() => { const n = new Date(); selected = n; viewYM = { y: n.getFullYear(), m: n.getMonth() }; renderAll(); });

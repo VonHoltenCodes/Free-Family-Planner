@@ -8,7 +8,7 @@ import { loadScript } from './gcal.js';
 
 const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
 const slug = (s) => (s || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || `kid-${Date.now()}`;
-const STEPS = ['Family', 'Kids', 'Location', 'Data', 'Google', 'Save'];
+const STEPS = ['Family', 'Kids', 'Location', 'Data', 'Calendars', 'Save'];
 const KID_COLORS = ['#ff69b4', '#4169e1', '#2bff66', '#ffd11a', '#ff9f5b', '#c98bdb', '#2bd0ff', '#ff3b2e'];
 
 export function openSetup(current, { firstRun = false } = {}) {
@@ -108,8 +108,32 @@ export function openSetup(current, { firstRun = false } = {}) {
       fbBox.hidden = draft.backend !== 'firestore'; syncBox.hidden = draft.backend !== 'sync';
       body.append(fbBox, syncBox);
     } else if (step === 4) {
-      body.appendChild(el('p', 'lead', 'Google Calendar: in Google Cloud Console enable the Calendar API, create an OAuth 2.0 Web client, and add this site\'s origin to Authorized JavaScript origins.'));
-      body.appendChild(field('OAuth client ID', text(draft.googleClientId, '1234567890-abc.apps.googleusercontent.com', (v) => { draft.googleClientId = v.trim(); })));
+      if (!Array.isArray(draft.calendars) || !draft.calendars.length) draft.calendars = [{ type: 'local', name: 'Family', color: '#2bff66' }];
+      body.appendChild(el('p', 'lead', 'Calendars are shown together on the grid. Mix and match: a local family calendar, any iCal/ICS feeds, and Google Calendar.'));
+      // local family calendar
+      const loc = draft.calendars.find((c) => c.type === 'local');
+      const locRow = el('div', 'panel-row'); const lchk = el('button', 'chk' + (loc ? ' on' : '')); lchk.type = 'button';
+      const lname = text(loc?.name || 'Family', 'Family', (v) => { const c = draft.calendars.find((x) => x.type === 'local'); if (c) c.name = v; });
+      const lcol = el('input'); lcol.type = 'color'; lcol.value = loc?.color || '#2bff66'; lcol.addEventListener('input', () => { const c = draft.calendars.find((x) => x.type === 'local'); if (c) c.color = lcol.value; });
+      lchk.addEventListener('click', () => { const i = draft.calendars.findIndex((x) => x.type === 'local'); if (i >= 0) draft.calendars.splice(i, 1); else draft.calendars.unshift({ type: 'local', name: lname.value || 'Family', color: lcol.value }); lchk.classList.toggle('on', i < 0); });
+      locRow.append(lchk, el('span', 'pname', 'Local family calendar (stored in your data backend, editable on the wall)'), lname, lcol); body.appendChild(locRow);
+      // ICS feeds
+      body.appendChild(el('div', 'sect', 'iCal / ICS feeds (read-only)'));
+      const feeds = el('div', 'kid-list'); body.appendChild(feeds);
+      const drawFeeds = () => { feeds.innerHTML = ''; draft.calendars.forEach((c, i) => { if (c.type !== 'ics') return; const row = el('div', 'kid-row');
+        row.append(text(c.name, 'Name (School, Soccer…)', (v) => { c.name = v; }), text(c.url, 'https://…/calendar.ics', (v) => { c.url = v.trim(); }));
+        const col = el('input'); col.type = 'color'; col.value = c.color || '#c98bdb'; col.addEventListener('input', () => { c.color = col.value; });
+        const rm = el('button', 'btn sm danger', '×'); rm.type = 'button'; rm.addEventListener('click', () => { draft.calendars.splice(i, 1); drawFeeds(); });
+        row.append(col, rm); feeds.appendChild(row); }); };
+      drawFeeds();
+      const addF = el('button', 'btn sm', '+ Add feed'); addF.type = 'button'; addF.addEventListener('click', () => { draft.calendars.push({ type: 'ics', name: '', url: '', color: KID_COLORS[(draft.calendars.length + 3) % KID_COLORS.length] }); drawFeeds(); }); body.appendChild(addF);
+      body.appendChild(el('small', 'hint', 'Where to find feed URLs: iCloud → Calendar → share → Public Calendar (webcal:// → use https://); Google → calendar settings → "Secret address in iCal format"; Outlook → Shared calendars → Publish; most school and sports sites have an "iCal" or "subscribe" link. Feeds are fetched through this server after you save (browsers cannot fetch them directly).'));
+      body.appendChild(testBtn('Test feeds', async () => { const f = draft.calendars.filter((c) => c.type === 'ics' && c.url); if (!f.length) throw new Error('no feeds added'); const res = [];
+        for (const c of f) { try { const r = await fetch(`api/ics.php?url=${encodeURIComponent(c.url)}`, { cache: 'no-store' }); if (r.status === 403) { res.push(`${c.name || c.url}: save first, then test`); continue; } if (!r.ok) throw new Error(`HTTP ${r.status}`); const t = await r.text(); if (!/BEGIN:VCALENDAR/i.test(t)) throw new Error('not an ICS file'); res.push(`${c.name || c.url}: ok, ${(t.match(/BEGIN:VEVENT/g) || []).length} events`); } catch (e) { res.push(`${c.name || c.url}: ${e.message}`); } }
+        return res.join(' · '); }));
+      // google
+      body.appendChild(el('div', 'sect', 'Google Calendar (read/write)'));
+      body.appendChild(field('OAuth client ID', text(draft.googleClientId, '1234567890-abc.apps.googleusercontent.com', (v) => { draft.googleClientId = v.trim(); }), 'Google Cloud Console → enable the Calendar API → OAuth 2.0 Web client → add this site\'s origin to Authorized JavaScript origins. Leave blank to skip Google.'));
       body.appendChild(field('Holiday calendar', text(draft.holidayCalendarId, DEFAULTS.holidayCalendarId, (v) => { draft.holidayCalendarId = v.trim(); }), 'any public Google calendar id; blank for none'));
       body.appendChild(el('small', 'hint', `This page's origin: ${location.origin}${location.origin.startsWith('http://') && !/localhost|127\.0\.0\.1/.test(location.origin) ? ' — Google only accepts http://localhost or https:// origins, so sign-in will not work from here.' : ''}`));
       body.appendChild(testBtn('Check client ID', async () => { if (!/\.apps\.googleusercontent\.com$/.test(draft.googleClientId)) throw new Error('does not look like a Google OAuth client ID'); await loadScript('https://accounts.google.com/gsi/client'); return 'Google Identity loaded — sign in from the calendar panel after saving'; }));
