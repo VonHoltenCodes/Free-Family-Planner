@@ -20,5 +20,6 @@ COPY tools/serve.py tools/serve.py
 COPY --from=ws4kp /src/dist/ web/ws4kp/
 # config.js is mounted at run time (see docker-compose.yml); the example keeps the image self-contained
 RUN [ -f web/config.js ] || cp web/config.example.js web/config.js
+VOLUME ["/app/data"]
 EXPOSE 8765
 CMD ["python3", "tools/serve.py", "--host", "0.0.0.0", "--port", "8765", "--no-open"]

@@ -9,7 +9,7 @@ import { loadDisplay, applyLayout, applyTheme, startDim, openDisplaySettings } f
 const config = await loadConfig();
 const display = loadDisplay();
 applyTheme(display);
-store.initStore(config.firebase);
+store.initStore(config);
 
 const $ = (id) => document.getElementById(id);
 const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
@@ -116,6 +116,7 @@ function bindList(name, formId, inputId, listId, countId) {
   }, () => led('led-fb', store.configured ? 'err' : 'warn'));
 }
 if (!store.configured) led('led-fb', 'warn');
+$('led-fb-label').textContent = { firestore: 'FIRESTORE', sync: 'SYNC STORE', local: 'LOCAL DATA' }[store.backendName] || 'NO DATA';
 bindList('shopping', 'shop-form', 'shop-input', 'shop-list', 'shop-count');
 bindList('notes', 'note-form', 'note-input', 'note-list', null);
 

@@ -14,7 +14,12 @@ export default {
     label: 'Your Town, ST',         // shown on the WeatherStar panel
     lat: 41.8781, lon: -87.6298,    // WeatherStar + outside temp (NWS, US only)
   },
-  // Firebase web app config (Project settings → Your apps → Web app). Firestore is the data store.
+  // Where lists, meals, chores (and the local calendar) live:
+  //   'firestore' — Firebase Firestore (cloud; phones + wall stay in sync)
+  //   'sync'      — self-hosted store on this same server (api/db.php or tools/serve.py); no cloud account
+  //   'local'     — this browser only
+  backend: 'sync',
+  // Firebase web app config (Project settings → Your apps → Web app) — only for backend: 'firestore'.
   firebase: {
     apiKey: '', authDomain: '', projectId: '', storageBucket: '', messagingSenderId: '', appId: '',
   },

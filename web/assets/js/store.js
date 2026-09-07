@@ -1,51 +1,42 @@
-// Firestore data layer. Collections: notes, shopping; docs: settings/weeklyMeals, chores/<kidId>.
-import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js';
-import {
-  getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy, setDoc, getDoc,
-} from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
+// Data layer facade. Picks a backend from config.backend:
+//   'firestore' — Firebase Firestore (cloud, real-time, phones + wall in sync)
+//   'sync'      — self-hosted store on this server (web/api/db.php or tools/serve.py), no cloud
+//   'local'     — this browser only (localStorage), zero setup
+// Every backend exposes the same API; planner.js never sees which one is active.
+import * as firestore from './backends/firestore.js';
+import * as sync from './backends/sync.js';
+import * as local from './backends/local.js';
 
-let db = null;
+export const BACKENDS = { firestore, sync, local };
+let impl = null;
 export let configured = false;
+export let backendName = 'none';
 
-/* Call once with config.firebase before using anything else. */
-export function initStore(firebaseConfig) {
-  configured = !!(firebaseConfig && firebaseConfig.apiKey && firebaseConfig.projectId);
-  if (configured) db = getFirestore(initializeApp(firebaseConfig));
-  else console.warn('Firebase not configured — lists, meals and chores are disabled');
+export function initStore(config) {
+  const choice = config.backend || (config.firebase?.apiKey ? 'firestore' : 'local');
+  try {
+    if (choice === 'firestore') {
+      if (!(config.firebase?.apiKey && config.firebase?.projectId)) throw new Error('Firebase not configured');
+      impl = firestore.create(config.firebase);
+    } else if (choice === 'sync') impl = sync.create();
+    else impl = local.create();
+    configured = true; backendName = impl.name;
+  } catch (e) { console.warn('data backend unavailable:', e.message); impl = null; configured = false; }
   return configured;
 }
+export const testFirebase = (cfg) => firestore.testConnection(cfg);
+export const testSync = () => sync.testConnection();
 
-/* Setup-wizard connectivity check: initialise a throwaway app and read one doc. */
-export async function testFirebase(firebaseConfig) {
-  const app = initializeApp(firebaseConfig, `test-${Date.now()}`);
-  const d = await getDoc(doc(getFirestore(app), 'settings', 'weeklyMeals'));
-  return d.exists() ? 'connected — existing meal plan found' : 'connected — empty project (fine for a fresh start)';
-}
-
-const notConfigured = () => Promise.reject(new Error('Firebase not configured'));
-
-/* Simple check lists: `notes` and `shopping` collections ({text, completed, createdAt}). */
-export function watchList(name, onItems, onError) {
-  if (!configured) { onItems([]); onError?.(new Error('not configured')); return () => {}; }
-  const q = query(collection(db, name), orderBy('createdAt', 'desc'));
-  return onSnapshot(q, (snap) => {
-    const items = [];
-    snap.forEach((d) => items.push({ id: d.id, ...d.data() }));
-    onItems(items);
-  }, (err) => { console.error(`watch ${name}:`, err); onError?.(err); });
-}
-export const addListItem = (name, text) => !configured ? notConfigured() : addDoc(collection(db, name), { text, completed: false, createdAt: new Date() });
-export const toggleListItem = (name, id, completed) => !configured ? notConfigured() : updateDoc(doc(db, name, id), { completed: !completed });
-export const deleteListItem = (name, id) => !configured ? notConfigured() : deleteDoc(doc(db, name, id));
-
-/* Weekly meals: single doc settings/weeklyMeals {Sunday..Saturday: string}. */
-export const watchMeals = (onMeals, onError) => !configured ? (onMeals({}), onError?.(new Error('not configured')), () => {}) : onSnapshot(doc(db, 'settings', 'weeklyMeals'),
-  (snap) => onMeals(snap.exists() ? snap.data() : {}),
-  (err) => { console.error('watch meals:', err); onError?.(err); });
-export const saveMeals = (meals) => !configured ? notConfigured() : setDoc(doc(db, 'settings', 'weeklyMeals'), meals);
-
-/* Chores: one doc per kid, chores/<kidId> {items:[{id,text,completed}]}. */
-export const watchChores = (kidId, onItems, onError) => !configured ? (onItems([]), onError?.(new Error('not configured')), () => {}) : onSnapshot(doc(db, 'chores', kidId),
-  (snap) => onItems(snap.exists() ? (snap.data().items || []) : null),
-  (err) => { console.error(`watch chores ${kidId}:`, err); onError?.(err); });
-export const setChores = (kidId, items) => !configured ? notConfigured() : setDoc(doc(db, 'chores', kidId), { items });
+const off = () => () => {};
+const nope = () => Promise.reject(new Error('data backend not configured'));
+export const watchList = (col, onItems, onError) => (impl ? impl.watchList(col, onItems, onError) : (onItems([]), onError?.(new Error('not configured')), off()));
+export const addListItem = (col, text) => (impl ? impl.addListItem(col, text) : nope());
+export const toggleListItem = (col, id, completed) => (impl ? impl.toggleListItem(col, id, completed) : nope());
+export const deleteListItem = (col, id) => (impl ? impl.deleteListItem(col, id) : nope());
+export const watchMeals = (onMeals, onError) => (impl ? impl.watchMeals(onMeals, onError) : (onMeals({}), onError?.(new Error('not configured')), off()));
+export const saveMeals = (meals) => (impl ? impl.saveMeals(meals) : nope());
+export const watchChores = (kidId, onItems, onError) => (impl ? impl.watchChores(kidId, onItems, onError) : (onItems([]), onError?.(new Error('not configured')), off()));
+export const setChores = (kidId, items) => (impl ? impl.setChores(kidId, items) : nope());
+export const watchEvents = (onItems, onError) => (impl ? impl.watchEvents(onItems, onError) : (onItems([]), off()));
+export const putEvent = (id, ev) => (impl ? impl.putEvent(id, ev) : nope());
+export const deleteEvent = (id) => (impl ? impl.deleteEvent(id) : nope());

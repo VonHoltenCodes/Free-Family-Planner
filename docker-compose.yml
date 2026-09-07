@@ -11,3 +11,6 @@ services:
       - "8765:8765"
     volumes:
       - ./web/config.js:/app/web/config.js:ro
+      - planner-data:/app/data          # self-hosted sync store (backend: 'sync')
+volumes:
+  planner-data:

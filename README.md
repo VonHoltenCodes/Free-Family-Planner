@@ -19,7 +19,7 @@ Retro hi-fi styling: beveled panels, LCD readouts, pixel headings, and a real We
 | Piece | Backed by | Notes |
 |---|---|---|
 | Calendar, week ahead, add/edit/delete events | Google Calendar API (OAuth in the browser) | pick any of your calendars; US holidays overlaid |
-| Shopping list, notes, meals, chores | Firebase Firestore (real-time) | edits sync instantly between the wall and your phone |
+| Shopping list, notes, meals, chores | your choice: **self-hosted sync store** (no cloud), Firebase Firestore, or this-device-only | edits sync between the wall and your phone in the first two |
 | WeatherStar 4000+ | bundled ws4kp 6.2.6 in kiosk mode | National Weather Service data, no API key |
 | Outside temp in the header | api.weather.gov | no API key |
 | Login gate | a tiny PHP session + password hash | keeps the page private on a public web server |
@@ -33,13 +33,16 @@ Everything runs in the browser. There are two ways to run it:
 
 ## Setup
 
-### 1. Firebase (data store)
-1. Create a Firebase project, add a **Web app**, enable **Firestore**.
-2. Copy the web app config into `web/config.js` (see below).
-3. Firestore rules: the app talks to Firestore anonymously, so lock the rules down to what you
-   are comfortable with (the login gate protects the *page*, not the database). The
-   collections used are `notes`, `shopping`, and the documents `settings/weeklyMeals` and
-   `chores/<kidId>`.
+### 1. Data store — pick one in the ⚙ wizard
+- **Self-hosted (default)**: a small JSON document store on the same server that serves the page —
+  `web/api/db.php` on a PHP host (file under `includes/data/`, which the web server must be able to
+  write) or built into `tools/serve.py` (`data/planner.json`; a volume in the Docker image). Phones and
+  the wall stay in sync, nothing leaves your server, no account needed.
+- **Firebase Firestore**: create a Firebase project, add a **Web app**, enable **Firestore**, paste the
+  web config into the wizard. The app talks to Firestore anonymously, so lock the rules down to what
+  you are comfortable with (the login gate protects the *page*, not the database). Collections used:
+  `notes`, `shopping`, `events`, and the documents `settings/weeklyMeals`, `chores/<kidId>`.
+- **This device only**: everything in the browser's storage. Zero setup, no sync.
 
 ### 2. Google Calendar (OAuth)
 1. In Google Cloud Console, enable the **Google Calendar API**.

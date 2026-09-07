@@ -5,6 +5,7 @@ export const DEFAULTS = {
   family: { title: 'FAMILY', subtitle: 'PLANNER', footer: ['FREE FAMILY PLANNER'], kids: [] },
   location: { label: '', lat: null, lon: null },
   firebase: { apiKey: '', authDomain: '', projectId: '', storageBucket: '', messagingSenderId: '', appId: '' },
+  backend: '',           // 'firestore' | 'sync' | 'local' — blank = firestore if configured, else local
   googleClientId: '',
   holidayCalendarId: 'en.usa#holiday@group.v.calendar.google.com',
 };
