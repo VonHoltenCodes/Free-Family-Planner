@@ -9,7 +9,7 @@ discussion lives in the linked issue.
 |---|---|---|
 | **Local-host mode** ✅ | `feat/local-host` | `tools/serve.py`, Docker image + compose, systemd units, and Android / Raspberry Pi / Docker kiosk guides in `docs/kiosk/`. |
 | **Setup menu** ✅ | `feat/setup-menu` | ⚙ wizard: family, kids, location search + NWS test, Firebase paste + test, Google client check; writes `config.js` server-side (PHP or `serve.py`) or falls back to browser storage + download. Opens itself on first run. |
-| **Configuration** | `feat/configuration` | In-app settings: which panels show and in what order, chores per kid, week-start day, 12/24h clock, units, portrait/landscape override, screen-off schedule. Stored per display (local) with optional sync. |
+| **Configuration** ✅ | `feat/configuration` | ☰ Display settings per screen: show/hide + reorder panels (layout engine re-flows both orientations), chores per kid, week start, 12/24h, °F/°C, orientation override, night-dim schedule. Stored in the browser. |
 | **Themes** | `feat/themes` | Theme packs on top of the CSS tokens: the current hi-fi default, an LCARS variant, a light "paper" theme, high-contrast. Theme picker in configuration. |
 | **Calendar providers** | `feat/calendar-providers` | Beyond Google: read-only ICS/iCal URLs (iCloud, Outlook, school calendars), CalDAV, and a purely local calendar for the no-cloud install. |
 | **Data backends** | `feat/data-backends` | Beyond Firestore: browser-local storage for a single display, and a tiny self-hosted sync server (SQLite) so phones and the wall stay in sync without Google. |
