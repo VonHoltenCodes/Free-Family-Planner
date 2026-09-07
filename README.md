@@ -107,6 +107,15 @@ and reorder panels, chores per kid, week start, 12/24-hour clock, °F/°C, force
 landscape, and a night-dim schedule (any touch wakes the screen for a minute). Different screens in
 the house can be arranged differently.
 
+## Themes
+Four looks, chosen per screen in ☰ Display: **Hi-Fi** (default), **LCARS**, **Paper** (light) and
+**High contrast**. A theme is one block of CSS token overrides — see `docs/roadmap/themes.md` to
+add your own.
+
+| Hi-Fi | LCARS | Paper | High contrast |
+|---|---|---|---|
+| ![](docs/themes/hifi.png) | ![](docs/themes/lcars.png) | ![](docs/themes/paper.png) | ![](docs/themes/contrast.png) |
+
 ## Layout
 Portrait, top to bottom (default order — change it in ☰ Display): header (date · outside temp · clock) → calendar month grid with a
 day pane → WeatherStar beside the shopping list → week ahead → meal plan → chores beside notes

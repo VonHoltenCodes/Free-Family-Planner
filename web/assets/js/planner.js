@@ -4,10 +4,11 @@ import { GCal } from './gcal.js';
 import { currentConditions } from './wx.js';
 import { loadConfig, isConfigured } from './config-loader.js';
 import { openSetup } from './setup.js';
-import { loadDisplay, applyLayout, startDim, openDisplaySettings } from './display.js';
+import { loadDisplay, applyLayout, applyTheme, startDim, openDisplaySettings } from './display.js';
 
 const config = await loadConfig();
 const display = loadDisplay();
+applyTheme(display);
 store.initStore(config.firebase);
 
 const $ = (id) => document.getElementById(id);
