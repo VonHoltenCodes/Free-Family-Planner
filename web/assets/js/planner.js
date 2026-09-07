@@ -1,8 +1,16 @@
 // Family Central Command — vanilla canvas build (no framework).
-import * as store from './store.js?v=3';
-import { GCal } from './gcal.js?v=3';
-import { currentConditions } from './wx.js?v=3';
-import config from '../../config.js';
+import * as store from './store.js';
+import { Calendars } from './calendars.js';
+import { currentConditions, resolveProvider, weatherStarUrl } from './wx.js';
+import { mountCard, openMeteoConditions } from './wx-card.js';
+import { loadConfig, isConfigured } from './config-loader.js';
+import { openSetup } from './setup.js';
+import { loadDisplay, applyLayout, applyTheme, startDim, openDisplaySettings } from './display.js';
+
+const config = await loadConfig();
+const display = loadDisplay();
+applyTheme(display);
+store.initStore(config);
 
 const $ = (id) => document.getElementById(id);
 const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
@@ -12,20 +20,26 @@ const parseLocal = (s) => { const [y, m, d] = s.split('-').map(Number); return n
 const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const FULL = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-const KIDS = config.family.kids;
-const CHORES_PER_KID = 3;
+const KIDS = config.family.kids || [];
+const CHORES_PER_KID = display.choresPerKid;
 
 /* ---------- branding from config ---------- */
 document.title = `${config.family.title} — ${config.family.subtitle}`;
 $('hdr-title').firstChild.textContent = config.family.title;
 $('hdr-subtitle').textContent = config.family.subtitle;
-$('wx-place').textContent = config.location.label;
+$('wx-place').textContent = config.location.label || '';
+$('btn-setup').addEventListener('click', () => openSetup(config));
+$('btn-display').addEventListener('click', () => openDisplaySettings(display, () => { if (display.choresPerKid !== CHORES_PER_KID) { location.reload(); return; } lastPortrait = null; fitCanvas(); tickClock(); if (config.location.lat != null) refreshWx(); if (typeof renderAll === 'function') renderAll(); dimTick(); }));
+const dimTick = startDim(display);
+if (!isConfigured(config)) setTimeout(() => openSetup(config, { firstRun: true }), 600);
 { const f = $('status-footer'); f.innerHTML = ''; (config.family.footer || []).forEach((t, i) => { if (i) f.appendChild(el('span', 'sep', '•')); f.appendChild(el('span', null, t)); }); }
 
 /* ---------- canvas scaler: design canvas fitted to any display ---------- */
+let lastPortrait = null;
 function fitCanvas() {
-  const portrait = window.innerHeight > window.innerWidth;
+  const portrait = display.orientation === 'auto' ? window.innerHeight > window.innerWidth : display.orientation === 'portrait';
   const c = $('canvas'); c.classList.toggle('portrait', portrait);
+  if (portrait !== lastPortrait) { lastPortrait = portrait; applyLayout(display, portrait); }
   const [w, h] = portrait ? [1080, 1920] : [1920, 1080];
   const s = Math.min(window.innerWidth / w, window.innerHeight / h);
   c.style.transform = `scale(${s})`;
@@ -43,9 +57,9 @@ let todayKey = dateKey(new Date());
 const onNewDay = [];
 function tickClock() {
   const now = new Date();
-  let h = now.getHours(); const ampm = h >= 12 ? 'PM' : 'AM'; h = h % 12 || 12;
+  let h = now.getHours(); const ampm = h >= 12 ? 'PM' : 'AM'; if (!display.clock24) h = h % 12 || 12;
   $('hdr-clock').textContent = `${pad(h)}:${pad(now.getMinutes())}`;
-  $('hdr-ampm').textContent = ampm;
+  $('hdr-ampm').textContent = display.clock24 ? '' : ampm;
   $('hdr-date').textContent = now.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' }).toUpperCase();
   const k = dateKey(now);
   if (k !== todayKey) { todayKey = k; onNewDay.forEach((f) => f()); }
@@ -58,23 +72,25 @@ $('btn-full').addEventListener('click', () => {
   if (!document.fullscreenElement) document.documentElement.requestFullscreen?.(); else document.exitFullscreen?.();
 });
 
-/* ---------- outside temp (NWS) ---------- */
+/* ---------- weather: WeatherStar 4000+ (NWS coverage) or the Open-Meteo card; header temp ---------- */
+let wxProvider = 'none';
 async function refreshWx() {
   try {
-    const w = await currentConditions();
-    $('hdr-temp').textContent = w.tempF;
+    const w = wxProvider === 'card' ? await openMeteoConditions(config.location, display.units) : await currentConditions(config.location);
+    $('hdr-temp').textContent = wxProvider === 'card' ? w.temp : (display.units === 'metric' ? Math.round((w.tempF - 32) * 5 / 9) : w.tempF);
+    document.querySelector('.lcd.temp .unit').textContent = display.units === 'metric' ? '°C' : '°F';
     $('hdr-cond').textContent = w.cond;
     led('led-wx', 'on');
-  } catch (e) { console.warn('NWS:', e); led('led-wx', 'warn'); }
+  } catch (e) { console.warn('weather:', e); led('led-wx', 'warn'); }
 }
-refreshWx();
-setInterval(refreshWx, 10 * 60 * 1000);
-
-/* ---------- WeatherStar 4000+ (clean upstream ws4kp build, kiosk mode) ---------- */
-{
-  const latLon = encodeURIComponent(JSON.stringify({ lat: config.location.lat, lon: config.location.lon }));
-  $('wx-frame').src = `ws4kp/index.html?settings-kiosk-checkbox=true&settings-units-select=us&latLon=${latLon}&v=4`;
-}
+(async () => {
+  if (config.location.lat == null) { led('led-wx', 'warn'); $('wx-frame').removeAttribute('src'); return; }
+  wxProvider = await resolveProvider(config.weather, config.location);
+  const bezel = document.querySelector('#p-wx .bezel');
+  if (wxProvider === 'card') { mountCard(bezel, config.location, config.location.label, display.units); $('led-wx-label').textContent = 'OPEN-METEO'; document.querySelector('#p-wx .tbar h2').textContent = 'Weather'; }
+  else { $('wx-frame').src = weatherStarUrl(config.location, config.weather, display.units); }
+  refreshWx(); setInterval(refreshWx, 10 * 60 * 1000);
+})();
 
 /* ---------- check lists: shopping + notes ---------- */
 function bindList(name, formId, inputId, listId, countId) {
@@ -101,6 +117,7 @@ function bindList(name, formId, inputId, listId, countId) {
   }, () => led('led-fb', store.configured ? 'err' : 'warn'));
 }
 if (!store.configured) led('led-fb', 'warn');
+$('led-fb-label').textContent = { firestore: 'FIRESTORE', sync: 'SYNC STORE', local: 'LOCAL DATA' }[store.backendName] || 'NO DATA';
 bindList('shopping', 'shop-form', 'shop-input', 'shop-list', 'shop-count');
 bindList('notes', 'note-form', 'note-input', 'note-list', null);
 
@@ -132,6 +149,7 @@ const mealBoxes = {};
 /* ---------- chores ---------- */
 {
   const wrap = $('kids');
+  if (!KIDS.length) wrap.appendChild(el('div', 'empty', 'Add your kids in ⚙ Setup to use the chore board.'));
   KIDS.forEach((kid) => {
     const box = el('div', 'kid'); box.style.setProperty('--kid', kid.color);
     box.appendChild(el('div', 'kn', kid.name.toUpperCase()));
@@ -161,9 +179,10 @@ const mealBoxes = {};
 }
 
 /* ---------- calendar ---------- */
-const gcal = new GCal();
-let events = [];      // raw Google events (selected calendar)
-let holidays = [];    // raw holiday events
+const cal = new Calendars(config);
+const gcal = cal.google;   // null when Google is not configured
+let events = [];      // normalised events from every provider (Google shape: start.date | start.dateTime)
+let holidays = [];    // holiday events (read-only)
 let expanded = [];    // per-day rows {ev, key, isHoliday, multi}
 let viewYM = (() => { const n = new Date(); return { y: n.getFullYear(), m: n.getMonth() }; })();
 let selected = new Date();
@@ -197,9 +216,10 @@ const fmtTime = (ev) => {
 function renderMonth() {
   const grid = $('cal-grid'); grid.innerHTML = '';
   $('cal-month').textContent = `${MONTHS[viewYM.m].toUpperCase()} ${viewYM.y}`;
-  DOW.forEach((d) => grid.appendChild(el('div', 'dow', d)));
+  const ws = display.weekStart;
+  for (let i = 0; i < 7; i++) grid.appendChild(el('div', 'dow', DOW[(i + ws) % 7]));
   const first = new Date(viewYM.y, viewYM.m, 1);
-  const start = new Date(first); start.setDate(1 - first.getDay());
+  const start = new Date(first); start.setDate(1 - ((first.getDay() - ws + 7) % 7));
   const selKey = dateKey(selected);
   for (let i = 0; i < 42; i++) {
     const d = new Date(start); d.setDate(start.getDate() + i);
@@ -212,7 +232,7 @@ function renderMonth() {
     const rows = eventsOn(key);
     if (rows.some((r) => r.isHoliday)) cell.classList.add('holiday');
     cell.appendChild(el('div', 'num', d.getDate()));
-    rows.slice(0, 3).forEach((r) => { const c = el('div', 'chip' + (r.isHoliday ? ' holiday' : ''), r.ev.summary || '(untitled)'); c.title = r.ev.summary || ''; cell.appendChild(c); });
+    rows.slice(0, 3).forEach((r) => { const c = el('div', 'chip' + (r.isHoliday ? ' holiday' : ''), r.ev.summary || '(untitled)'); c.title = (r.ev.calendarName ? `${r.ev.calendarName}: ` : '') + (r.ev.summary || ''); if (r.ev.color) c.style.borderLeftColor = r.ev.color; cell.appendChild(c); });
     if (rows.length > 3) cell.appendChild(el('div', 'chip more', `+${rows.length - 3} more`));
     cell.addEventListener('click', () => { selected = d; if (d.getMonth() !== viewYM.m) viewYM = { y: d.getFullYear(), m: d.getMonth() }; renderAll(); });
     grid.appendChild(cell);
@@ -223,14 +243,14 @@ function renderDay() {
   $('dp-dow').textContent = FULL[selected.getDay()].toUpperCase();
   $('dp-date').textContent = selected.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
   const list = $('dp-list'); list.innerHTML = '';
-  if (authMsg) { renderAuthPrompt(list); return; }
+  if (authMsg) renderAuthPrompt(list);
   const rows = eventsOn(dateKey(selected));
   if (!rows.length) { list.appendChild(el('div', 'empty', 'No events')); return; }
   rows.forEach((r) => {
     const card = el('div', 'evt' + (r.isHoliday ? ' holiday' : ''));
-    card.appendChild(el('div', 'when', r.isHoliday ? 'HOLIDAY' : fmtTime(r.ev)));
+    const when = el('div', 'when', r.isHoliday ? 'HOLIDAY' : fmtTime(r.ev)); if (r.ev.color && !r.isHoliday) when.style.background = r.ev.color; card.appendChild(when);
     const info = el('div', 'info'); info.appendChild(el('div', 'ttl', r.ev.summary || '(untitled)'));
-    const sub = [r.ev.location, r.multi ? 'Multi-day' : ''].filter(Boolean).join(' • '); if (sub) info.appendChild(el('div', 'loc', sub));
+    const sub = [r.ev.calendarName, r.ev.location, r.multi ? 'Multi-day' : ''].filter(Boolean).join(' • '); if (sub) info.appendChild(el('div', 'loc', sub));
     card.appendChild(info);
     if (!r.isHoliday) card.addEventListener('click', () => openModal(r.ev));
     list.appendChild(card);
@@ -245,8 +265,8 @@ function renderWeek() {
     const card = el('div', 'wday' + (i === 0 ? ' today' : '') + (key === selKey ? ' sel' : ''));
     const h = el('div', 'wh'); h.appendChild(el('span', 'dn', DOW[d.getDay()].toUpperCase())); h.appendChild(el('span', 'dd', d.getDate())); card.appendChild(h);
     const l = el('div', 'wl'); const rows = eventsOn(key);
-    if (!rows.length) l.appendChild(el('span', 'empty', authMsg ? '—' : 'No events'));
-    rows.slice(0, 3).forEach((r) => { const c = el('div', 'chip' + (r.isHoliday ? ' holiday' : ''), r.ev.summary || '(untitled)'); if (!r.isHoliday) c.addEventListener('click', (e) => { e.stopPropagation(); openModal(r.ev); }); l.appendChild(c); });
+    if (!rows.length) l.appendChild(el('span', 'empty', 'No events'));
+    rows.slice(0, 3).forEach((r) => { const c = el('div', 'chip' + (r.isHoliday ? ' holiday' : ''), r.ev.summary || '(untitled)'); if (r.ev.color) c.style.borderLeftColor = r.ev.color; if (!r.isHoliday) c.addEventListener('click', (e) => { e.stopPropagation(); openModal(r.ev); }); l.appendChild(c); });
     if (rows.length > 3) l.appendChild(el('div', 'chip more', `+${rows.length - 3}`));
     card.appendChild(l);
     card.addEventListener('click', () => { selected = d; viewYM = { y: d.getFullYear(), m: d.getMonth() }; renderAll(); });
@@ -256,43 +276,50 @@ function renderWeek() {
 function renderAll() { renderMonth(); renderDay(); renderWeek(); }
 
 async function loadEvents(showBusy = true) {
-  if (!gcal.signedIn) return;
   if (showBusy) $('cal-refresh').disabled = true;
   try {
-    if (!gcal.calendars.length) { await gcal.listCalendars(); renderCalSelect(); }
-    [events, holidays] = await Promise.all([gcal.listEvents(), gcal.listHolidays()]);
-    expandAll(); renderAll(); led('led-gc', 'on');
-    $('cal-sub').textContent = gcal.calendars.find((c) => c.id === gcal.calendarId)?.summary || 'Google Calendar';
+    if (gcal?.signedIn && !gcal.calendars.length) { await gcal.listCalendars(); renderCalSelect(); }
+    const all = await cal.loadAll();
+    events = all.filter((e) => !e.isHoliday); holidays = all.filter((e) => e.isHoliday);
+    expandAll(); renderAll();
+    const feedErr = Object.values(cal.status || {}).some((v) => typeof v === 'string');
+    led('led-gc', feedErr ? 'warn' : ((gcal?.signedIn || cal.ics.length || cal.local) ? 'on' : ''));
+    const parts = []; if (gcal?.signedIn) parts.push(gcal.calendars.find((c) => c.id === gcal.calendarId)?.summary || 'Google'); cal.ics.forEach((f) => parts.push(f.name)); if (cal.local) parts.push(cal.local.name);
+    $('cal-sub').textContent = parts.join(' + ') || 'No calendars';
+    setWriteUI();
   } catch (e) {
     console.error('calendar load:', e); led('led-gc', 'err');
     if (e.status === 401) { setAuthUI(false, 'Session expired — sign in again'); } else toast('Calendar load failed');
   } finally { $('cal-refresh').disabled = false; }
 }
+function setWriteUI() { const w = cal.writable().length > 0; $('cal-add').hidden = !w; $('dp-add').hidden = !w; }
+cal.onLocalChange = () => loadEvents(false);
 function renderCalSelect() {
   const sel = $('cal-select'); sel.innerHTML = '';
   gcal.calendars.forEach((c) => { const o = el('option', null, c.summary + (c.primary ? ' (Primary)' : '')); o.value = c.id; sel.appendChild(o); });
   sel.value = gcal.calendarId; sel.hidden = gcal.calendars.length < 2;
 }
 $('cal-select').addEventListener('change', (e) => { gcal.calendarId = e.target.value; loadEvents(); });
+$('cal-refresh').hidden = false;
 $('cal-refresh').addEventListener('click', () => loadEvents());
-$('cal-signout').addEventListener('click', () => gcal.signOut());
+$('cal-signout').addEventListener('click', () => gcal?.signOut());
 $('cal-prev').addEventListener('click', () => { viewYM.m--; if (viewYM.m < 0) { viewYM.m = 11; viewYM.y--; } renderMonth(); });
 $('cal-next').addEventListener('click', () => { viewYM.m++; if (viewYM.m > 11) { viewYM.m = 0; viewYM.y++; } renderMonth(); });
 $('cal-today').addEventListener('click', () => { const n = new Date(); selected = n; viewYM = { y: n.getFullYear(), m: n.getMonth() }; renderAll(); });
 $('cal-add').addEventListener('click', () => openModal(null));
 $('dp-add').addEventListener('click', () => openModal(null));
 
-let authMsg = null;   // null = signed in; otherwise {text, err?} shown in the day pane
+let authMsg = null;   // set while Google is configured but not signed in
 function setAuthUI(signedIn, msg) {
-  $('cal-signout').hidden = !signedIn; $('cal-add').hidden = !signedIn; $('cal-refresh').hidden = !signedIn; $('dp-add').hidden = !signedIn;
-  if (signedIn) { authMsg = null; }
-  else { authMsg = { text: 'Connect Google Calendar to see and manage family events', err: msg || '' }; events = []; holidays = []; expandAll(); led('led-gc', ''); $('cal-sub').textContent = 'Google Calendar'; }
-  renderAll();
+  $('cal-signout').hidden = !signedIn; $('cal-refresh').hidden = false;
+  if (signedIn || !cal.hasGoogle) { authMsg = null; }
+  else { authMsg = { text: 'Sign in to see your Google Calendar too', err: msg || '' }; led('led-gc', ''); }
+  setWriteUI(); loadEvents(false);
 }
 function renderAuthPrompt(list) {
-  const g = el('div', 'gstate');
+  const g = el('div', 'gstate compact');
   g.appendChild(el('div', null, authMsg.text));
-  const b = el('button', 'btn', 'Sign in with Google'); b.type = 'button'; b.addEventListener('click', () => gcal.requestToken(false)); g.appendChild(b);
+  const b = el('button', 'btn sm', 'Sign in with Google'); b.type = 'button'; b.addEventListener('click', () => gcal.requestToken(false)); g.appendChild(b);
   if (authMsg.err) g.appendChild(el('div', 'err', authMsg.err));
   list.appendChild(g);
 }
@@ -304,8 +331,13 @@ allday.addEventListener('click', () => setAllDay(!allday.classList.contains('on'
 allday.addEventListener('keydown', (e) => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); allday.click(); } });
 function openModal(ev) {
   editing = ev;
-  $('evt-title').textContent = ev ? 'Edit Event' : 'New Event';
-  $('ev-delete').hidden = !ev;
+  const ro = !!ev?.readOnly;
+  $('evt-title').textContent = ev ? (ro ? `${ev.calendarName || 'Feed'} event (read-only)` : 'Edit Event') : 'New Event';
+  $('ev-delete').hidden = !ev || ro; $('ev-save').hidden = ro;
+  document.querySelectorAll('#evt-form input, #evt-form textarea').forEach((i) => { i.disabled = ro; });
+  const targets = cal.writable(); const tw = $('ev-target-wrap'); const ts = $('ev-target');
+  tw.hidden = !!ev || targets.length < 2; ts.innerHTML = ''; targets.forEach((t) => { const o = el('option', null, t.name); o.value = t.id; ts.appendChild(o); });
+  if (!ev && targets.length) ts.value = targets[0].id;
   const k = dateKey(selected);
   if (!ev) { $('ev-summary').value = ''; $('ev-loc').value = ''; $('ev-desc').value = ''; $('ev-sdate').value = k; $('ev-edate').value = k; $('ev-stime').value = '09:00'; $('ev-etime').value = '10:00'; setAllDay(false); }
   else {
@@ -330,30 +362,27 @@ $('evt-form').addEventListener('submit', async (e) => {
     resource = { summary, description: $('ev-desc').value, location: $('ev-loc').value, start: { dateTime: s.toISOString(), timeZone: tz }, end: { dateTime: en.toISOString(), timeZone: tz } };
   }
   $('ev-save').disabled = true;
-  try { if (editing) await gcal.update(editing.id, resource); else await gcal.insert(resource); closeModal(); toast(editing ? 'Event updated' : 'Event added'); await loadEvents(false); }
+  try { if (editing) await cal.update(editing, resource); else await cal.insert($('ev-target').value || cal.writable()[0]?.id, resource); closeModal(); toast(editing ? 'Event updated' : 'Event added'); await loadEvents(false); }
   catch (err) { console.error(err); toast('Save failed'); }
   finally { $('ev-save').disabled = false; }
 });
 $('ev-delete').addEventListener('click', async () => {
   if (!editing || !window.confirm('Delete this event?')) return;
-  try { await gcal.remove(editing.id); closeModal(); toast('Event deleted'); await loadEvents(false); } catch (err) { console.error(err); toast('Delete failed'); }
+  try { await cal.remove(editing); closeModal(); toast('Event deleted'); await loadEvents(false); } catch (err) { console.error(err); toast('Delete failed'); }
 });
 window.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('evt-overlay').hidden) closeModal(); });
 
-/* boot calendar */
-authMsg = { text: 'Connecting to Google Calendar…', err: '' };
+/* boot calendars */
 renderAll();
 (async () => {
-  if (!config.googleClientId) { authMsg = { text: 'Google Calendar not configured', err: 'Set googleClientId in config.js' }; renderAll(); led('led-gc', 'warn'); return; }
+  if (!gcal) { setAuthUI(false); return; }
   try {
     await gcal.init();
-    gcal.onAuthChange = (ok, err) => { if (ok) { setAuthUI(true); loadEvents(); } else setAuthUI(false, err ? 'Sign-in failed' : ''); };
+    gcal.onAuthChange = (ok, err) => { setAuthUI(ok, err ? 'Sign-in failed' : ''); };
     setAuthUI(false);
-    // silent re-auth like the old build: works when this browser already granted access
-    try { gcal.requestToken(true); } catch (e) { console.log('silent auth unavailable'); }
+    try { gcal.requestToken(true); } catch (e) { console.log('silent auth unavailable'); }   // silent re-auth when this browser already granted access
   } catch (e) {
-    console.error('gapi init:', e); led('led-gc', 'err');
-    authMsg = { text: 'Google Calendar unavailable', err: `Google API failed to load: ${e.message}` }; renderAll();
+    console.error('gapi init:', e); led('led-gc', 'err'); authMsg = { text: 'Google Calendar unavailable', err: `Google API failed to load: ${e.message}` }; loadEvents(false);
   }
 })();
 onNewDay.push(() => { const n = new Date(); selected = n; viewYM = { y: n.getFullYear(), m: n.getMonth() }; renderAll(); });

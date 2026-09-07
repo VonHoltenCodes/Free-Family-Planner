@@ -1,0 +1,7 @@
+.git
+reference
+web/ws4kp
+web/includes/auth_config.php
+deploy.env
+docs
+*.png
