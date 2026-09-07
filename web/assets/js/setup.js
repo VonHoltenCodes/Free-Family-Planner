@@ -2,13 +2,13 @@
 // Saves server-side when possible (save-config.php on a hosted install, or tools/serve.py locally),
 // otherwise falls back to a localStorage override + a config.js download.
 import { deepMerge, DEFAULTS, LS_KEY } from './config-loader.js';
-import { testFirebase } from './store.js';
+import { testFirebase, testSync } from './store.js';
 import { lookupPoint } from './wx.js';
 import { loadScript } from './gcal.js';
 
 const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
 const slug = (s) => (s || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || `kid-${Date.now()}`;
-const STEPS = ['Family', 'Kids', 'Location', 'Firebase', 'Google', 'Save'];
+const STEPS = ['Family', 'Kids', 'Location', 'Data', 'Google', 'Save'];
 const KID_COLORS = ['#ff69b4', '#4169e1', '#2bff66', '#ffd11a', '#ff9f5b', '#c98bdb', '#2bd0ff', '#ff3b2e'];
 
 export function openSetup(current, { firstRun = false } = {}) {
@@ -84,15 +84,29 @@ export function openSetup(current, { firstRun = false } = {}) {
       body.appendChild(testBtn('Test NWS', async () => { const p = await lookupPoint(loc.lat, loc.lon); return `${p.city}, ${p.state} — station ${p.station}`; }));
     } else if (step === 3) {
       const fb = draft.firebase;
-      body.appendChild(el('p', 'lead', 'Firestore stores the shopping list, notes, meals and chores. Create a Firebase project → add a Web app → paste its config here (the whole "const firebaseConfig = {…}" snippet or plain JSON both work).'));
-      const ta = el('textarea'); ta.rows = 5; ta.placeholder = '{ "apiKey": "…", "authDomain": "…", "projectId": "…", … }';
+      body.appendChild(el('p', 'lead', 'Where the shopping list, notes, meals, chores and the local calendar live.'));
+      const choices = [['sync', 'Self-hosted (this server)', 'No cloud account. Phones and the wall share the store on this same server — works with the hosted PHP install and with tools/serve.py / Docker.'],
+        ['firestore', 'Firebase Firestore', 'Google\'s cloud database. Real-time sync anywhere; needs a free Firebase project.'],
+        ['local', 'This device only', 'Zero setup. Data stays in this browser; nothing syncs.']];
+      const picker = el('div', 'kid-list'); body.appendChild(picker);
+      const fbBox = el('div'); const syncBox = el('div');
+      const paintChoice = () => { picker.innerHTML = ''; choices.forEach(([v, name, desc]) => { const row = el('div', 'panel-row'); const chk = el('button', 'chk' + (draft.backend === v ? ' on' : '')); chk.type = 'button';
+        chk.addEventListener('click', () => { draft.backend = v; paintChoice(); fbBox.hidden = v !== 'firestore'; syncBox.hidden = v !== 'sync'; }); const t = el('div'); t.appendChild(el('div', 'pname', name)); t.appendChild(el('small', 'hint', desc)); row.append(chk, t); picker.appendChild(row); }); };
+      if (!draft.backend) draft.backend = fb.apiKey ? 'firestore' : 'sync';
+      paintChoice();
+      // firebase details
+      const ta = el('textarea'); ta.rows = 4; ta.placeholder = '{ "apiKey": "…", "authDomain": "…", "projectId": "…", … }';
       ta.addEventListener('input', () => { const parsed = parseFirebase(ta.value); if (parsed) { Object.assign(fb, parsed); paint(); note('parsed ✓', 'ok'); } else note(ta.value.trim() ? 'could not parse yet…' : ''); });
-      body.appendChild(field('Paste Firebase web config', ta));
-      const grid = el('div', 'kv'); body.appendChild(grid);
+      fbBox.appendChild(field('Paste Firebase web config', ta, 'Firebase console → Project settings → Your apps → Web app; the whole "const firebaseConfig = {…}" snippet or plain JSON both work'));
+      const grid = el('div', 'kv'); fbBox.appendChild(grid);
       const paint = () => { grid.innerHTML = ''; ['apiKey', 'authDomain', 'projectId', 'storageBucket', 'messagingSenderId', 'appId'].forEach((k) => { grid.appendChild(el('span', 'k', k)); const i = text(fb[k], '', (v) => { fb[k] = v; }); grid.appendChild(i); }); };
       paint();
-      body.appendChild(testBtn('Test Firestore', () => testFirebase(fb)));
-      body.appendChild(el('small', 'hint', 'Firestore rules: the page login protects the page, not the database — restrict rules to what you are comfortable with. Leave blank to run without lists.'));
+      fbBox.appendChild(testBtn('Test Firestore', () => testFirebase(fb)));
+      fbBox.appendChild(el('small', 'hint', 'Firestore rules: the page login protects the page, not the database — restrict rules to what you are comfortable with.'));
+      syncBox.appendChild(testBtn('Test sync store', () => testSync()));
+      syncBox.appendChild(el('small', 'hint', 'Hosted install: the web server must be able to write includes/data/. Local install: data/planner.json next to the repo (a Docker volume in the image).'));
+      fbBox.hidden = draft.backend !== 'firestore'; syncBox.hidden = draft.backend !== 'sync';
+      body.append(fbBox, syncBox);
     } else if (step === 4) {
       body.appendChild(el('p', 'lead', 'Google Calendar: in Google Cloud Console enable the Calendar API, create an OAuth 2.0 Web client, and add this site\'s origin to Authorized JavaScript origins.'));
       body.appendChild(field('OAuth client ID', text(draft.googleClientId, '1234567890-abc.apps.googleusercontent.com', (v) => { draft.googleClientId = v.trim(); })));

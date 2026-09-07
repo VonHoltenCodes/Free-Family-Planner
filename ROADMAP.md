@@ -12,7 +12,7 @@ discussion lives in the linked issue.
 | **Configuration** ✅ | `feat/configuration` | ☰ Display settings per screen: show/hide + reorder panels (layout engine re-flows both orientations), chores per kid, week start, 12/24h, °F/°C, orientation override, night-dim schedule. Stored in the browser. |
 | **Themes** ✅ | `feat/themes` | Four theme packs as token overrides — Hi-Fi (default), LCARS, Paper (light), High contrast — picked per display in ☰ Display. Adding a theme is one CSS block. |
 | **Calendar providers** | `feat/calendar-providers` | Beyond Google: read-only ICS/iCal URLs (iCloud, Outlook, school calendars), CalDAV, and a purely local calendar for the no-cloud install. |
-| **Data backends** | `feat/data-backends` | Beyond Firestore: browser-local storage for a single display, and a tiny self-hosted sync server (SQLite) so phones and the wall stay in sync without Google. |
+| **Data backends** ✅ | `feat/data-backends` | `store.js` is a facade over three backends: Firestore, **self-hosted sync store** (a locked JSON file served by `api/db.php` or `tools/serve.py`, polled every 3 s — no cloud account), and browser-local. Chosen in the ⚙ wizard's Data step. |
 | **Weather options** | `feat/weather-options` | WeatherStar display picker (which screens rotate), metric units, and a plain conditions card for outside the US where NWS data does not exist. |
 | **Touch & accessibility** | `feat/touch-a11y` | Bigger hit targets for kids, on-screen keyboard friendliness, screen-reader labels, reduced-motion. |
 
