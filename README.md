@@ -1,0 +1,123 @@
+# Free Family Planner
+
+A wall-display family command center: Google Calendar, a week-ahead strip, a live
+**WeatherStar 4000+** panel, shopping list, notes, weekly meal plan and a chore board for the
+kids. Built for a tablet or TV mounted on the kitchen wall, in portrait or landscape.
+
+No framework, no build step for the app itself: plain HTML, CSS and ES-module JavaScript on a
+fixed design canvas (1080×1920 portrait / 1920×1080 landscape) that scales to whatever the
+display is, so it looks the same on a 32" panel, a phone, or a laptop.
+
+![Portrait layout](docs/screenshot-portrait.png)
+
+Retro hi-fi styling: beveled panels, LCD readouts, pixel headings, and a real WeatherStar
+4000+ (the 90s cable-TV local weather computer, via the excellent
+[ws4kp](https://github.com/netbymatt/ws4kp) simulator) running in the corner.
+
+## What it uses
+
+| Piece | Backed by | Notes |
+|---|---|---|
+| Calendar, week ahead, add/edit/delete events | Google Calendar API (OAuth in the browser) | pick any of your calendars; US holidays overlaid |
+| Shopping list, notes, meals, chores | Firebase Firestore (real-time) | edits sync instantly between the wall and your phone |
+| WeatherStar 4000+ | bundled ws4kp 6.2.6 in kiosk mode | National Weather Service data, no API key |
+| Outside temp in the header | api.weather.gov | no API key |
+| Login gate | a tiny PHP session + password hash | keeps the page private on a public web server |
+
+Everything runs in the browser. There are two ways to run it:
+
+- **Local host** — `python3 tools/serve.py` on any machine (the display itself, a Pi, a NAS,
+  your laptop). No PHP, no login page, nothing exposed to the internet.
+- **Public web host** — upload `web/` to any PHP-capable host; a small PHP session + password
+  hash keeps the page private so the family can open it from anywhere.
+
+## Setup
+
+### 1. Firebase (data store)
+1. Create a Firebase project, add a **Web app**, enable **Firestore**.
+2. Copy the web app config into `web/config.js` (see below).
+3. Firestore rules: the app talks to Firestore anonymously, so lock the rules down to what you
+   are comfortable with (the login gate protects the *page*, not the database). The
+   collections used are `notes`, `shopping`, and the documents `settings/weeklyMeals` and
+   `chores/<kidId>`.
+
+### 2. Google Calendar (OAuth)
+1. In Google Cloud Console, enable the **Google Calendar API**.
+2. Create an **OAuth 2.0 Client ID** of type *Web application*; add your site origin
+   (e.g. `https://example.com`) to *Authorized JavaScript origins*.
+3. Put the client ID in `web/config.js`. The first load on a device shows a *Sign in with
+   Google* button; after that, sign-in is silent on refresh.
+
+### 3. Site config
+```sh
+cp web/config.example.js web/config.js        # family name, kids, location, Firebase, OAuth client
+cp web/includes/auth_config.example.php web/includes/auth_config.php
+php -r 'echo password_hash("your-password", PASSWORD_DEFAULT), PHP_EOL;'   # paste into auth_config.php
+```
+Both files are gitignored. `config.js` is served to the browser (Firebase web keys and OAuth
+client IDs are public identifiers by design); `auth_config.php` is never served.
+
+### 4. WeatherStar 4000+ bundle
+```sh
+tools/build-ws4kp.sh          # clones netbymatt/ws4kp v6.2.6, builds it, drops it in web/ws4kp/
+```
+Needs Node.js. The script patches two root-relative paths in the ws4kp bundle so it can run
+from a subfolder. If you keep your own ws4kp clone, point `WS4KP_REPO` at it to skip the clone.
+
+### 5a. Run it locally
+```sh
+python3 tools/serve.py                # opens http://localhost:8765/
+python3 tools/serve.py --host 0.0.0.0 # reachable from other devices on your LAN
+```
+Skip `auth_config.php` for this mode — there is no login gate. Google OAuth only trusts
+`http://localhost` or an `https://` origin, so sign in to Calendar on the display device
+itself via localhost (Firestore, WeatherStar and the NWS temp work from any origin).
+
+### 5b. Or deploy to a web host
+Upload the `web/` folder to your host, or use the rsync helper:
+```sh
+cp deploy.env.example deploy.env && $EDITOR deploy.env
+./deploy.sh
+```
+Open the URL, sign in, then on the wall device open the page and tap the ⛶ button for
+fullscreen. A kiosk browser on Android/Fire tablets works well; the login cookie lasts 7 days.
+
+### Local preview
+```sh
+cd web && python3 -m http.server 8765 --bind 127.0.0.1   # open http://127.0.0.1:8765/app.html
+```
+Firestore, NWS and WeatherStar work locally; Google sign-in only works on an authorized origin.
+
+## Layout
+Portrait, top to bottom: header (date · outside temp · clock) → calendar month grid with a
+day pane → WeatherStar beside the shopping list → week ahead → meal plan → chores beside notes
+→ status bar (Firestore / Google Calendar / NWS LEDs, sign-out). Landscape re-flows the same
+panels into two columns. Both grids live in `web/assets/css/planner.css`; the canvas scaler is
+`fitCanvas()` in `web/assets/js/planner.js`.
+
+## Files
+```
+web/                 everything that gets deployed
+  index.php          session gate → app.html
+  auth.php           sign-in page
+  app.html           the app shell
+  assets/css|js|fonts
+  config.js          YOUR site config (gitignored) — config.example.js is the template
+  includes/          auth_config.php (gitignored) — auth_config.example.php is the template
+  ws4kp/             generated by tools/build-ws4kp.sh (gitignored)
+tools/build-ws4kp.sh
+deploy.sh, deploy.env.example
+```
+
+## Roadmap
+See [ROADMAP.md](ROADMAP.md) — setup menu, in-app configuration, themes, more calendar and data
+backends, kiosk install guides. Work happens on `feat/*` branches with a draft PR per feature.
+
+## Credits
+- [WeatherStar 4000+ (ws4kp)](https://github.com/netbymatt/ws4kp) by Matt Walsh — MIT.
+- Fonts: [Saira](https://fonts.google.com/specimen/Saira), [Pixelify Sans](https://fonts.google.com/specimen/Pixelify+Sans)
+  and [DSEG7](https://github.com/keshikan/DSEG) — SIL Open Font License; Star4000 — from ws4kp.
+- Weather data: National Weather Service (api.weather.gov).
+
+## License
+GPL-3.0 — see [LICENSE](LICENSE).

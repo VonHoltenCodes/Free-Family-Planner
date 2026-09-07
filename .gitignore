@@ -1,0 +1,9 @@
+# generated WeatherStar 4000+ bundle (tools/build-ws4kp.sh)
+web/ws4kp/
+# per-site secrets / personal config — never commit
+web/config.js
+web/includes/auth_config.php
+deploy.env
+# local scratch
+reference/
+*.log

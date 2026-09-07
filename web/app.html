@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="theme-color" content="#14141a">
+<meta name="mobile-web-app-capable" content="yes">
+<title>Family Planner</title>
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="assets/css/planner.css?v=5">
+</head>
+<body>
+<div class="scaler">
+<div class="canvas" id="canvas">
+
+  <!-- header / rack title bar -->
+  <header class="rack">
+    <div class="elbow"></div>
+    <div class="flourish"></div>
+    <div class="title" id="hdr-title">FAMILY<small id="hdr-subtitle">PLANNER</small></div>
+    <div class="flourish"></div>
+    <div class="spacer"></div>
+    <div class="date" id="hdr-date">—</div>
+    <div class="lcdbox"><span class="lab">OUTSIDE</span><span class="lcd temp"><span class="ghost">888</span><span id="hdr-temp">--</span><span class="unit">°F</span></span><span class="wxword" id="hdr-cond"></span></div>
+    <div class="lcdbox"><span class="lab">TIME</span><span class="lcd clock"><span class="ghost">88:88</span><span id="hdr-clock">--:--</span><span class="ampm" id="hdr-ampm"></span></span></div>
+    <button class="btn icon" id="btn-full" title="Toggle fullscreen">⛶</button>
+  </header>
+
+  <div class="main">
+    <!-- LEFT: calendar + week ahead -->
+    <div class="col left">
+      <section class="panel" id="p-cal">
+        <div class="tbar"><span class="tag"></span><h2>Calendar</h2><span class="sub" id="cal-sub">Google Calendar</span><span class="grow"></span>
+          <select id="cal-select" hidden></select>
+          <button class="btn sm" id="cal-add" hidden>+ Event</button>
+          <button class="btn sm" id="cal-refresh" hidden>Refresh</button>
+          <button class="btn sm" id="cal-signout" hidden>Sign out</button>
+        </div>
+        <div class="body">
+          <div class="cal-tools" id="cal-tools">
+            <button class="btn sm" id="cal-prev">◀</button>
+            <div class="mon" id="cal-month">—</div>
+            <button class="btn sm" id="cal-next">▶</button>
+            <button class="btn sm" id="cal-today">Today</button>
+          </div>
+          <div class="cal-wrap" id="cal-wrap">
+            <div class="cal-grid" id="cal-grid"></div>
+            <div class="daypane">
+              <div class="dp-head"><div class="dow" id="dp-dow">—</div><div class="dt" id="dp-date">—</div></div>
+              <div class="dp-list" id="dp-list"></div>
+              <div class="dp-foot"><button class="btn sm" id="dp-add" hidden>+ Add event for this day</button></div>
+            </div>
+          </div>
+        </div>
+      </section>
+      <section class="panel" id="p-week">
+        <div class="tbar"><span class="tag blue"></span><h2>Week Ahead</h2></div>
+        <div class="body"><div class="week" id="week"></div></div>
+      </section>
+    </div>
+
+    <!-- RIGHT: weatherstar + shopping -->
+    <div class="col right">
+      <section class="panel wx" id="p-wx">
+        <div class="tbar"><span class="tag gold"></span><h2>WeatherStar 4000+</h2><span class="grow"></span><span class="sub" id="wx-place"></span></div>
+        <div class="body"><div class="bezel"><iframe id="wx-frame" title="WeatherStar 4000+" src="about:blank" allow="autoplay"></iframe></div></div>
+      </section>
+      <section class="panel" id="p-shop">
+        <div class="tbar"><span class="tag green"></span><h2>Shopping List</h2><span class="grow"></span><span class="sub" id="shop-count"></span></div>
+        <div class="body">
+          <form class="field" id="shop-form"><input type="text" id="shop-input" placeholder="Add item…" autocomplete="off"><button class="btn" type="submit">Add</button></form>
+          <ul class="checklist" id="shop-list"></ul>
+        </div>
+      </section>
+    </div>
+
+    <!-- BOTTOM: meals / chores / notes -->
+    <div class="row bottom">
+      <section class="panel" id="p-meals">
+        <div class="tbar"><span class="tag mauve"></span><h2>Meal Plan</h2></div>
+        <div class="body"><div class="meals" id="meals"></div></div>
+      </section>
+      <section class="panel" id="p-chores">
+        <div class="tbar"><span class="tag"></span><h2>Chores</h2></div>
+        <div class="body"><div class="kids" id="kids"></div></div>
+      </section>
+      <section class="panel" id="p-notes">
+        <div class="tbar"><span class="tag blue"></span><h2>Notes</h2></div>
+        <div class="body">
+          <form class="field" id="note-form"><input type="text" id="note-input" placeholder="Add note…" autocomplete="off"><button class="btn" type="submit">Add</button></form>
+          <ul class="checklist" id="note-list"></ul>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <!-- status bar -->
+  <footer class="status">
+    <div class="pills"><span class="pill o"></span><span class="pill m"></span><span class="pill b"></span></div>
+    <span class="footer-text" id="status-footer"></span>
+    <span class="grow"></span>
+    <span class="svc"><span class="led" id="led-fb"></span>FIRESTORE</span>
+    <span class="svc"><span class="led" id="led-gc"></span>GOOGLE CAL</span>
+    <span class="svc"><span class="led" id="led-wx"></span>NWS</span>
+    <span class="sep">•</span><a href="logout.php">SIGN OUT</a>
+  </footer>
+
+  <!-- event modal -->
+  <div class="overlay" id="evt-overlay" hidden>
+    <form class="dlg" id="evt-form">
+      <div class="tbar"><h3 id="evt-title">New Event</h3><span class="grow"></span><button type="button" class="x" id="evt-close">×</button></div>
+      <div class="form">
+        <label>Title<input type="text" id="ev-summary" required autocomplete="off"></label>
+        <label class="inline"><span class="chk" id="ev-allday" role="checkbox" aria-checked="false" tabindex="0"></span>All day</label>
+        <div class="row2"><label>Start date<input type="date" id="ev-sdate" required></label><label class="timed">Start time<input type="time" id="ev-stime"></label></div>
+        <div class="row2"><label>End date<input type="date" id="ev-edate" required></label><label class="timed">End time<input type="time" id="ev-etime"></label></div>
+        <label>Location<input type="text" id="ev-loc" autocomplete="off"></label>
+        <label>Description<textarea id="ev-desc" rows="3"></textarea></label>
+        <div class="actions">
+          <button type="button" class="btn danger left" id="ev-delete" hidden>Delete</button>
+          <button type="button" class="btn" id="ev-cancel">Cancel</button>
+          <button type="submit" class="btn on" id="ev-save">Save</button>
+        </div>
+      </div>
+    </form>
+  </div>
+
+  <div class="toast" id="toast"></div>
+</div>
+</div>
+
+<script type="module" src="assets/js/planner.js?v=5"></script>
+</body>
+</html>

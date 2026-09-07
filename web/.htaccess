@@ -1,0 +1,47 @@
+# Family Planner - Apache Configuration
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    # (no RewriteBase needed — rules are relative to this folder wherever it is mounted)
+
+    # Block direct access to includes directory and the raw app shell (index.php gates it)
+    RewriteRule ^includes/ - [F,L]
+    RewriteRule ^app\.html$ - [F,L]
+
+    # Static assets and the bundled WeatherStar 4000+ build are served directly
+    RewriteRule ^(assets|ws4kp)/ - [L]
+
+    # Serve index.php for all other requests (SPA routing)
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteRule ^(.*)$ index.php [L,QSA]
+</IfModule>
+
+# The site root .htaccess denies *.json everywhere; WeatherStar needs its data/ + manifest + playlist JSON
+<FilesMatch "\.json$">
+    Order allow,deny
+    Allow from all
+</FilesMatch>
+
+<IfModule mod_headers.c>
+    # The site root sets X-Frame-Options DENY with "Header always"; that blocks the WeatherStar
+    # iframe. Override in the same (always) table so the response carries exactly one value.
+    Header always set X-Frame-Options "SAMEORIGIN"
+    Header always set X-Content-Type-Options "nosniff"
+    Header always set X-XSS-Protection "1; mode=block"
+</IfModule>
+
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE text/html text/css application/javascript application/json
+</IfModule>
+
+<IfModule mod_expires.c>
+    ExpiresActive On
+    ExpiresByType text/css "access plus 1 week"
+    ExpiresByType application/javascript "access plus 1 week"
+    ExpiresByType image/png "access plus 1 month"
+    ExpiresByType image/x-icon "access plus 1 month"
+    ExpiresByType image/svg+xml "access plus 1 month"
+    ExpiresByType font/ttf "access plus 1 month"
+    ExpiresByType font/woff "access plus 1 month"
+</IfModule>
