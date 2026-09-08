@@ -26,6 +26,7 @@ export const controllable = (kind) => !!CONTROL[kind];
 export function tileKind(ent) {
   const d = ent.domain || (ent.id || '').split('.')[0]; const dc = ent.deviceClass || '';
   if (d === 'camera') return 'camera';
+  if (d === 'alarm_control_panel') return 'alarm';
   if (d === 'media_player') return 'media';
   if (d === 'fan') return 'onoff';
   if (d === 'climate') return 'climate';
@@ -49,6 +50,7 @@ function tileFace(kind, s) {
     case 'motion': return { big: st === 'on' ? 'MOTION' : 'CLEAR', small: '', on: st === 'on' };
     case 'onoff': return { big: st === 'on' ? 'ON' : st === 'off' ? 'OFF' : String(st).toUpperCase(), small: a.brightness != null ? `${Math.round(a.brightness / 2.55)}%` : '', on: st === 'on' };
     case 'cover': return { big: String(st).toUpperCase(), small: '', on: st === 'closed' };
+    case 'alarm': return { big: { armed_away: 'ARMED', armed_home: 'ARMED HOME', armed_night: 'ARMED NIGHT', disarmed: 'DISARMED', pending: 'PENDING', triggered: 'TRIGGERED' }[st] || String(st).toUpperCase(), small: st === 'armed_away' ? 'away' : '', on: String(st).startsWith('armed'), warn: st === 'triggered' || st === 'pending' };
     case 'media': return { big: st === 'playing' ? 'PLAYING' : st === 'paused' ? 'PAUSED' : String(st).toUpperCase(), small: [a.media_title, a.media_artist].filter(Boolean).join(' — ') || (a.source || ''), on: st === 'playing' };
     case 'weather': return { big: a.temperature != null ? `${fmt(a.temperature)}°` : String(st), small: WX_WORDS[st] || String(st).replace(/-/g, ' '), on: true };
     default: return { big: `${fmt(st)}${s?.unit ? ` ${s.unit}` : ''}`, small: '', on: st !== 'unavailable' && st !== 'unknown' };

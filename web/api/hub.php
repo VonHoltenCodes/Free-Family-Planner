@@ -15,7 +15,7 @@ $dir = __DIR__ . '/../includes/data'; $file = "$dir/hub.json";
 $hub = is_file($file) ? (json_decode(file_get_contents($file), true) ?: []) : [];
 $op = $_GET['op'] ?? ''; $body = $_SERVER['REQUEST_METHOD'] === 'POST' ? (json_decode(file_get_contents('php://input'), true) ?: []) : [];
 $out = function ($code, $o) { http_response_code($code); echo json_encode($o, JSON_UNESCAPED_SLASHES); exit; };
-$DOMAINS = ['camera', 'media_player', 'fan', 'climate', 'sensor', 'binary_sensor', 'person', 'lock', 'switch', 'light', 'cover', 'weather', 'device_tracker', 'input_boolean'];
+$DOMAINS = ['camera', 'media_player', 'fan', 'alarm_control_panel', 'climate', 'sensor', 'binary_sensor', 'person', 'lock', 'switch', 'light', 'cover', 'weather', 'device_tracker', 'input_boolean'];
 
 function hub_req($method, $url, $token, $body = null) {
     $opts = ['http' => ['method' => $method, 'timeout' => 10, 'ignore_errors' => true, 'header' => "Content-Type: application/json\r\n" . ($token ? "Authorization: Bearer $token\r\n" : '')]];

@@ -6,7 +6,7 @@ The hub URL + token live in data/hub.json (never in config.js, which the browser
 """
 import json, urllib.request, urllib.error
 
-DOMAINS = ('camera', 'media_player', 'fan', 'climate', 'sensor', 'binary_sensor', 'person', 'lock', 'switch', 'light', 'cover', 'weather', 'device_tracker', 'input_boolean')
+DOMAINS = ('camera', 'media_player', 'fan', 'alarm_control_panel', 'climate', 'sensor', 'binary_sensor', 'person', 'lock', 'switch', 'light', 'cover', 'weather', 'device_tracker', 'input_boolean')
 
 class HubError(Exception): pass
 
