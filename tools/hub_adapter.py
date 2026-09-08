@@ -48,7 +48,14 @@ class HomeAssistant:
                'lock': ('lock', 'lock'), 'unlock': ('lock', 'unlock'), 'open': ('cover', 'open_cover'), 'close': ('cover', 'close_cover')}.get(action)
         if action == 'snapshot':
             if dom != 'camera': raise HubError('snapshot is for cameras')
-            _req('POST', f'{self.url}/api/services/blink/trigger_camera', self.token, {'entity_id': entity}); return True   # Blink: take a fresh picture
+            _req('POST', f'{self.url}/api/services/blink/trigger_camera', self.token, {'entity_id': entity})   # Blink: take a fresh picture
+            import time, threading
+            def poke():   # Blink's poll is 5 min; ask HA to re-read this camera a few times so the new thumbnail lands quickly
+                for delay in (6, 12, 20):
+                    time.sleep(delay)
+                    try: _req('POST', f'{self.url}/api/services/homeassistant/update_entity', self.token, {'entity_id': entity})
+                    except HubError: pass
+            threading.Thread(target=poke, daemon=True).start(); return True
         if not svc: raise HubError(f'unknown action {action}')
         _req('POST', f'{self.url}/api/services/{svc[0]}/{svc[1]}', self.token, {'entity_id': entity}); return True
     def calendars(self): return [{'id': c['entity_id'], 'name': c.get('name', c['entity_id'])} for c in _req('GET', f'{self.url}/api/calendars', self.token)]
