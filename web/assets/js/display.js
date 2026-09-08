@@ -21,7 +21,8 @@ const unavailable = new Set(['house', 'power']);
 export function setPanelAvailable(key, ok) { if (ok) unavailable.delete(key); else unavailable.add(key); }
 
 const DEFAULT_SCREENS = {
-  family:  { order: ['cal', 'wx', 'shop', 'week', 'meals', 'chores', 'notes', 'power', 'house'], hidden: [], wide: [] },
+  // Family = the planner exactly as it was; house + electricity live on the Command tab
+  family:  { v: 2, order: ['cal', 'wx', 'shop', 'week', 'meals', 'chores', 'notes', 'power', 'house'], hidden: ['power', 'house'], wide: [] },
   // Command = the house: controls first; weather, lists, meals, chores and notes live on the Family tab
   command: { v: 3, order: ['house', 'power', 'cal', 'week', 'wx', 'notes', 'shop', 'meals', 'chores'], hidden: ['wx', 'notes', 'shop', 'meals', 'chores'], wide: ['house'] },
 };
