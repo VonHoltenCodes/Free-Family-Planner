@@ -164,6 +164,17 @@ header when a spike is on or within three hours. Set the threshold in the wizard
 price also goes out through `/api/state` for Home Assistant automations. Delivery charges are fixed
 and not shown; this is the part you can plan around.
 
+## API and CLI
+Everything the wizard does is also an HTTP API — `/api/v1` on both servers — with a stdlib-only
+command-line client, `tools/ffp`, so you can set the planner up and drive it from a terminal,
+a script, or an agent:
+```sh
+ffp hub set --type homeassistant --url http://homeassistant.local:8123 --token <HA token>
+ffp tiles add light.kitchen --label Kitchen --control
+ffp list shopping add "Milk"
+```
+Routes, auth (LAN-open or a bearer token) and examples: [docs/api.md](docs/api.md).
+
 ## Home Assistant, Home-IO and other hubs
 Both directions:
 - **Planner → hub:** a read-only snapshot at `/api/state` (tonight's dinner, open shopping items,

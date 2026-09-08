@@ -5,7 +5,7 @@
  *   GET  ?op=get | test | entities | states&ids=a,b | todo
  *   POST ?op=save {type,url,token?,todoEntity} | todo-add {text} | todo-set {uid,completed} | todo-remove {uid}
  */
-define('FP_AUTH', true);
+if (!defined('FP_AUTH')) define('FP_AUTH', true);
 require_once __DIR__ . '/../includes/auth_config.php';
 ini_set('session.cookie_httponly', 1); ini_set('session.use_only_cookies', 1); ini_set('session.cookie_samesite', 'Strict');
 session_name(FP_SESSION_NAME); session_set_cookie_params(FP_SESSION_LIFETIME); session_start();
@@ -62,7 +62,7 @@ try {
         if ($op === 'entities') { usort($ents, fn($x, $y) => strcasecmp($x['name'], $y['name'])); $out(200, ['entities' => $ents]); }
         $out(200, ['states' => (object)$st]);
     }
-    if ($op === 'calendars') { $cs = hub_req('GET', "$url/api/calendars", $tok); $out(200, ['calendars' => array_map(fn($c) => ['id' => $c['entity_id'], 'name' => $c['name'] ?? $c['entity_id']], is_array($cs) ? $cs : [])]); }
+    if ($op === 'calendars') { try { $cs = hub_req('GET', "$url/api/calendars", $tok); } catch (Exception $e) { if (str_contains($e->getMessage(), '404')) $cs = []; else throw $e; } $out(200, ['calendars' => array_map(fn($c) => ['id' => $c['entity_id'], 'name' => $c['name'] ?? $c['entity_id']], is_array($cs) ? $cs : [])]); }
     if ($op === 'calevents') { $ent = preg_replace('/[^a-z0-9_.]/', '', $_GET['entity'] ?? ''); $ev = hub_req('GET', "$url/api/calendars/$ent?start=" . rawurlencode($_GET['start'] ?? '') . '&end=' . rawurlencode($_GET['end'] ?? ''), $tok); $out(200, ['events' => is_array($ev) ? $ev : []]); }
     if ($op === 'camera') { $ent = preg_replace('/[^a-z0-9_.]/', '', $_GET['entity'] ?? ''); $ctx = stream_context_create(['http' => ['timeout' => 15, 'ignore_errors' => true, 'header' => "Authorization: Bearer $tok\r\n"]]); $img = @file_get_contents("$url/api/camera_proxy/$ent", false, $ctx); if ($img === false || $img === '') $out(502, ['error' => 'camera unavailable']); $ct = 'image/jpeg'; foreach ($http_response_header ?? [] as $h) if (stripos($h, 'Content-Type:') === 0) $ct = trim(substr($h, 13)); header("Content-Type: $ct"); echo $img; exit; }
     if ($op === 'call') { $ent = $body['entity'] ?? ''; $dom = explode('.', $ent)[0]; $act = $body['action'] ?? '';
