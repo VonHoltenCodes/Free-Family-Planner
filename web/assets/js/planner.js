@@ -70,6 +70,8 @@ function fitCanvas() {
   // size and place the scaler to the *visible* viewport (handles pinch-zoom, URL bars, side nav bars)
   const sc = document.querySelector('.scaler'); sc.style.left = `${v.x}px`; sc.style.top = `${v.y}px`; sc.style.width = `${v.w}px`; sc.style.height = `${v.h}px`;
   baseViewport = { w: v.w, h: v.h, scale: s };
+  const c2 = c.getBoundingClientRect();
+  stateSet('display', { vv: [Math.round(v.w), Math.round(v.h), Math.round(v.x), Math.round(v.y)], zoom: +v.zoom.toFixed(2), inner: [window.innerWidth, window.innerHeight], screen: [screen.width, screen.height], dpr: devicePixelRatio, scale: +s.toFixed(3), portrait, canvasBox: [Math.round(c2.left), Math.round(c2.top), Math.round(c2.width), Math.round(c2.height)], fullscreen: !!document.fullscreenElement, ua: navigator.userAgent.slice(0, 120) });
   if (location.search.includes('debug')) debugReadout(v, s, portrait);
 }
 function debugReadout(v, s, portrait) {

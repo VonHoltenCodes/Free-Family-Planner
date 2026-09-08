@@ -20,6 +20,7 @@ function build() {
     shopping: list(snap.shopping || []), notes: list(snap.notes || []),
     chores: Object.fromEntries(Object.entries(snap.chores || {}).map(([id, k]) => [id, { name: k.name, done: k.items.filter((c) => c.completed && c.text).length, total: k.items.filter((c) => c.text).length, items: k.items.filter((c) => c.text).map((c) => ({ text: c.text, completed: !!c.completed })) }])),
     events: evs, weather: snap.weather, power: snap.power,
+    display: snap.display,   // viewport diagnostics from the wall (helps support layout issues)
   };
 }
 async function publish() {
