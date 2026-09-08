@@ -5,6 +5,7 @@ import { currentConditions, resolveProvider, weatherStarUrl } from './wx.js';
 import { mountCard, openMeteoConditions } from './wx-card.js';
 import { loadConfig, isConfigured } from './config-loader.js';
 import { openSetup } from './setup.js';
+import { stateSet } from './state-publisher.js';
 import { loadDisplay, applyLayout, applyTheme, startDim, openDisplaySettings } from './display.js';
 
 const config = await loadConfig();
@@ -28,6 +29,7 @@ document.title = `${config.family.title} — ${config.family.subtitle}`;
 $('hdr-title').firstChild.textContent = config.family.title;
 $('hdr-subtitle').textContent = config.family.subtitle;
 $('wx-place').textContent = config.location.label || '';
+stateSet('family', { title: config.family.title, subtitle: config.family.subtitle, location: config.location.label || '' });
 $('btn-setup').addEventListener('click', () => openSetup(config));
 $('btn-display').addEventListener('click', () => openDisplaySettings(display, () => { if (display.choresPerKid !== CHORES_PER_KID) { location.reload(); return; } lastPortrait = null; fitCanvas(); tickClock(); if (config.location.lat != null) refreshWx(); if (typeof renderAll === 'function') renderAll(); dimTick(); }));
 const dimTick = startDim(display);
@@ -98,7 +100,7 @@ async function refreshWx() {
     $('hdr-temp').textContent = wxProvider === 'card' ? w.temp : (display.units === 'metric' ? Math.round((w.tempF - 32) * 5 / 9) : w.tempF);
     document.querySelector('.lcd.temp .unit').textContent = display.units === 'metric' ? '°C' : '°F';
     $('hdr-cond').textContent = w.cond;
-    led('led-wx', 'on');
+    led('led-wx', 'on'); stateSet('weather', { temp: Number($('hdr-temp').textContent), cond: w.cond, units: display.units, provider: wxProvider });
   } catch (e) { console.warn('weather:', e); led('led-wx', 'warn'); }
 }
 (async () => {
@@ -119,7 +121,7 @@ function bindList(name, formId, inputId, listId, countId) {
     try { await store.addListItem(name, text); } catch (err) { toast('Save failed'); console.error(err); }
   });
   store.watchList(name, (items) => {
-    led('led-fb', 'on');
+    led('led-fb', 'on'); stateSet(name, items);
     list.innerHTML = '';
     if (!items.length) { list.appendChild(el('li', 'empty', 'Nothing here.')); }
     items.forEach((it) => {
@@ -153,18 +155,19 @@ const mealBoxes = {};
     head.appendChild(clr);
     const ta = el('textarea'); ta.placeholder = '…'; ta.rows = 3; ta.setAttribute('aria-label', `${day} meal`);
     const save = debounce(() => store.saveMeals(meals).catch(() => toast('Save failed')), 500);
-    ta.addEventListener('input', () => { meals = { ...meals, [day]: ta.value }; save(); });
+    ta.addEventListener('input', () => { meals = { ...meals, [day]: ta.value }; save(); stateSet('meals', meals); });
     card.append(head, ta); wrap.appendChild(card); mealBoxes[day] = ta;
   });
   const markToday = () => { const t = FULL[new Date().getDay()]; wrap.querySelectorAll('.meal').forEach((c) => c.classList.toggle('today', c.dataset.day === t)); };
   markToday(); onNewDay.push(markToday);
   store.watchMeals((m) => {
-    meals = { ...Object.fromEntries(FULL.map((d) => [d, ''])), ...m };
+    meals = { ...Object.fromEntries(FULL.map((d) => [d, ''])), ...m }; stateSet('meals', meals);
     FULL.forEach((d) => { const ta = mealBoxes[d]; if (document.activeElement !== ta && ta.value !== (meals[d] || '')) ta.value = meals[d] || ''; });
   }, () => led('led-fb', store.configured ? 'err' : 'warn'));
 }
 
 /* ---------- chores ---------- */
+const choresState = {}; const stateSnapshotChores = () => choresState;
 {
   const wrap = $('kids');
   if (!KIDS.length) wrap.appendChild(el('div', 'empty', 'Add your kids in ⚙ Setup to use the chore board.'));
@@ -182,11 +185,11 @@ const mealBoxes = {};
       inp.addEventListener('input', () => { items[i] = { ...items[i], text: inp.value }; row.classList.toggle('done', !!items[i].completed); writeText(); });
       row.append(chk, inp); box.appendChild(row); rows.push({ row, chk, inp });
     }
-    const render = () => rows.forEach((r, i) => {
+    const render = () => { const cur = stateSnapshotChores(); cur[kid.id] = { name: kid.name, items: items.map((it) => ({ ...it })) }; stateSet('chores', cur); rows.forEach((r, i) => {
       const it = items[i] || { id: i, text: '', completed: false };
       r.chk.classList.toggle('on', !!it.completed); r.chk.setAttribute('aria-checked', String(!!it.completed)); r.row.classList.toggle('done', !!it.completed);
       if (document.activeElement !== r.inp && r.inp.value !== (it.text || '')) r.inp.value = it.text || '';
-    });
+    }); };
     store.watchChores(kid.id, (remote) => {
       if (remote === null) { items = Array.from({ length: CHORES_PER_KID }, (_, i) => ({ id: i, text: '', completed: false })); write(); }
       else { items = remote.slice(0, CHORES_PER_KID); while (items.length < CHORES_PER_KID) items.push({ id: items.length, text: '', completed: false }); }
@@ -299,7 +302,7 @@ async function loadEvents(showBusy = true) {
   try {
     if (gcal?.signedIn && !gcal.calendars.length) { await gcal.listCalendars(); renderCalSelect(); }
     const all = await cal.loadAll();
-    events = all.filter((e) => !e.isHoliday); holidays = all.filter((e) => e.isHoliday);
+    events = all.filter((e) => !e.isHoliday); holidays = all.filter((e) => e.isHoliday); stateSet('events', events);
     expandAll(); renderAll();
     const feedErr = Object.values(cal.status || {}).some((v) => typeof v === 'string');
     led('led-gc', feedErr ? 'warn' : ((gcal?.signedIn || cal.ics.length || cal.local) ? 'on' : ''));
