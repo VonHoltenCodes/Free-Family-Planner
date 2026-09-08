@@ -15,12 +15,17 @@ async function api(op, params = {}, body) {
 export const hub = {
   status: () => api('get'), save: (cfg) => api('save', {}, cfg), test: () => api('test'), entities: () => api('entities').then((r) => r.entities),
   states: (ids) => api('states', { ids: ids.join(',') }).then((r) => r.states),
+  call: (entity, action) => api('call', {}, { entity, action }),
   todo: () => api('todo').then((r) => r.items), todoAdd: (text) => api('todo-add', {}, { text }), todoSet: (uid, completed) => api('todo-set', {}, { uid, completed }), todoRemove: (uid) => api('todo-remove', {}, { uid }),
 };
 
 /* ---------- tiles ---------- */
+export const controllable = (kind) => !!CONTROL[kind];
 export function tileKind(ent) {
   const d = ent.domain || (ent.id || '').split('.')[0]; const dc = ent.deviceClass || '';
+  if (d === 'camera') return 'camera';
+  if (d === 'media_player') return 'media';
+  if (d === 'fan') return 'onoff';
   if (d === 'climate') return 'climate';
   if (d === 'person' || d === 'device_tracker') return 'presence';
   if (d === 'lock') return 'lock';
@@ -42,20 +47,36 @@ function tileFace(kind, s) {
     case 'motion': return { big: st === 'on' ? 'MOTION' : 'CLEAR', small: '', on: st === 'on' };
     case 'onoff': return { big: st === 'on' ? 'ON' : st === 'off' ? 'OFF' : String(st).toUpperCase(), small: a.brightness != null ? `${Math.round(a.brightness / 2.55)}%` : '', on: st === 'on' };
     case 'cover': return { big: String(st).toUpperCase(), small: '', on: st === 'closed' };
+    case 'media': return { big: st === 'playing' ? 'PLAYING' : st === 'paused' ? 'PAUSED' : String(st).toUpperCase(), small: [a.media_title, a.media_artist].filter(Boolean).join(' — ') || (a.source || ''), on: st === 'playing' };
     case 'weather': return { big: a.temperature != null ? `${fmt(a.temperature)}°` : String(st), small: WX_WORDS[st] || String(st).replace(/-/g, ' '), on: true };
     default: return { big: `${fmt(st)}${s?.unit ? ` ${s.unit}` : ''}`, small: '', on: st !== 'unavailable' && st !== 'unknown' };
   }
 }
-export function mountHouse(host, tiles, onStatus) {
+const CONTROL = { onoff: ['toggle'], lock: ['lock', 'unlock'], cover: ['open', 'close'] };
+export function mountHouse(host, tiles, onStatus, { toast } = {}) {
   host.innerHTML = '';
   if (!tiles.length) { host.appendChild(el('div', 'empty', 'Pick tiles in ⚙ Setup → Home hub.')); return () => {}; }
-  const nodes = tiles.map((t) => { const n = el('div', 'tile'); n.dataset.entity = t.entity; n.appendChild(el('div', 'tl', t.label || t.entity)); n.appendChild(el('div', 'tb', '—')); n.appendChild(el('div', 'ts', '')); host.appendChild(n); return n; });
+  const nodes = tiles.map((t) => { const n = el('div', 'tile'); n.dataset.entity = t.entity; n.appendChild(el('div', 'tl', t.label || t.entity)); if ((t.kind || tileKind({ id: t.entity })) === 'camera') { const img = el('img', 'cam'); img.alt = t.label || t.entity; n.appendChild(img); n.classList.add('camera'); } else { n.appendChild(el('div', 'tb', '—')); n.appendChild(el('div', 'ts', '')); } host.appendChild(n); return n; });
+  let lastStates = {};
+  const act = async (t, n) => {
+    const kind = n.dataset.kind; const s = lastStates[t.entity]; if (!t.control || !CONTROL[kind]) return;
+    let action = 'toggle';
+    if (kind === 'lock') { action = s?.state === 'locked' ? 'unlock' : 'lock'; if (!window.confirm(`${action.toUpperCase()} ${t.label || t.entity}?`)) return; }
+    if (kind === 'cover') action = s?.state === 'open' || s?.state === 'opening' ? 'close' : 'open';
+    n.classList.add('busy');
+    try { await hub.call(t.entity, action); toast?.(`${t.label || t.entity}: ${action}`); setTimeout(refresh, 1200); }
+    catch (e) { toast?.(`${t.label || t.entity}: ${e.message}`); }
+    finally { n.classList.remove('busy'); }
+  };
+  tiles.forEach((t, i) => { if (t.control) { nodes[i].tabIndex = 0; nodes[i].setAttribute('role', 'button'); nodes[i].addEventListener('click', () => act(t, nodes[i])); nodes[i].addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); act(t, nodes[i]); } }); } });
   let timer;
   const refresh = async () => {
     try {
-      const states = await hub.states(tiles.map((t) => t.entity));
-      tiles.forEach((t, i) => { const s = states[t.entity]; const kind = t.kind || tileKind({ id: t.entity, deviceClass: s?.deviceClass }); const f = tileFace(kind, s);
-        nodes[i].querySelector('.tb').textContent = f.big; nodes[i].querySelector('.ts').textContent = f.small; nodes[i].className = `tile ${kind}${f.on ? ' on' : ''}${f.warn ? ' warn' : ''}${s ? '' : ' offline'}`; });
+      const states = await hub.states(tiles.map((t) => t.entity)); lastStates = states;
+      tiles.forEach((t, i) => { const s = states[t.entity]; const kind = t.kind || tileKind({ id: t.entity, deviceClass: s?.deviceClass }); nodes[i].dataset.kind = kind;
+        if (kind === 'camera') { const img = nodes[i].querySelector('img.cam'); img.src = `api/hub.php?op=camera&entity=${encodeURIComponent(t.entity)}&_=${Date.now()}`; nodes[i].className = `tile camera${s ? ' on' : ' offline'}`; return; }
+        const f = tileFace(kind, s);
+        nodes[i].querySelector('.tb').textContent = f.big; nodes[i].querySelector('.ts').textContent = f.small; nodes[i].className = `tile ${kind}${f.on ? ' on' : ''}${f.warn ? ' warn' : ''}${s ? '' : ' offline'}${t.control && CONTROL[kind] ? ' ctl' : ''}`; });
       onStatus?.('on');
     } catch (e) { console.warn('hub tiles:', e.message); onStatus?.('warn'); nodes.forEach((n) => n.classList.add('offline')); }
   };

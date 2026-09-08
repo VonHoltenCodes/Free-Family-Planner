@@ -7,7 +7,7 @@ import { loadConfig, isConfigured } from './config-loader.js';
 import { openSetup } from './setup.js';
 import { stateSet } from './state-publisher.js';
 import { hub, mountHouse, startTodoSync } from './hub.js';
-import { loadDisplay, applyLayout, applyTheme, startDim, openDisplaySettings, setPanelAvailable } from './display.js';
+import { loadDisplay, applyLayout, applyTheme, startDim, openDisplaySettings, setPanelAvailable, effectiveMode, currentScreen, SCREENS } from './display.js';
 
 const config = await loadConfig();
 const display = loadDisplay();
@@ -32,7 +32,7 @@ $('hdr-subtitle').textContent = config.family.subtitle;
 $('wx-place').textContent = config.location.label || '';
 stateSet('family', { title: config.family.title, subtitle: config.family.subtitle, location: config.location.label || '' });
 $('btn-setup').addEventListener('click', () => openSetup(config));
-$('btn-display').addEventListener('click', () => openDisplaySettings(display, () => { if (display.choresPerKid !== CHORES_PER_KID) { location.reload(); return; } lastPortrait = null; fitCanvas(); tickClock(); if (config.location.lat != null) refreshWx(); if (typeof renderAll === 'function') renderAll(); dimTick(); }));
+$('btn-display').addEventListener('click', () => openDisplaySettings(display, config, () => { if (display.choresPerKid !== CHORES_PER_KID) { location.reload(); return; } lastPortrait = null; fitCanvas(); tickClock(); if (config.location.lat != null) refreshWx(); if (typeof renderAll === 'function') renderAll(); dimTick(); }));
 const dimTick = startDim(display);
 if (!isConfigured(config)) setTimeout(() => openSetup(config, { firstRun: true }), 600);
 { const f = $('status-footer'); f.innerHTML = ''; (config.family.footer || []).forEach((t, i) => { if (i) f.appendChild(el('span', 'sep', '•')); f.appendChild(el('span', null, t)); }); }
@@ -56,7 +56,7 @@ function fitCanvas() {
   if (keyboardGuard()) return;
   const portrait = display.orientation === 'auto' ? window.innerHeight > window.innerWidth : display.orientation === 'portrait';
   const c = $('canvas'); c.classList.toggle('portrait', portrait);
-  if (portrait !== lastPortrait) { lastPortrait = portrait; applyLayout(display, portrait); }
+  if (portrait !== lastPortrait) { lastPortrait = portrait; applyLayout(display, portrait, currentScreen(display, config)); renderTabs(); }
   const [w, h] = portrait ? [1080, 1920] : [1920, 1080];
   const s = Math.min(window.innerWidth / w, window.innerHeight / h);
   c.style.transform = `scale(${s})`;
@@ -67,6 +67,17 @@ window.visualViewport?.addEventListener('resize', fitCanvas);
 document.addEventListener('focusin', (e) => { if (isField(e.target)) setTimeout(fitCanvas, 250); });
 document.addEventListener('focusout', () => setTimeout(fitCanvas, 100));
 fitCanvas();
+
+/* ---------- screens: Family / Command tabs ---------- */
+function renderTabs() {
+  const nav = $('tabs'); const mode = effectiveMode(display, config); nav.hidden = mode !== 'both'; nav.innerHTML = '';
+  if (mode !== 'both') return;
+  Object.entries(SCREENS).forEach(([k, name]) => { const b = el('button', 'tab' + (display.active === k ? ' on' : ''), name.toUpperCase()); b.type = 'button'; b.setAttribute('aria-pressed', String(display.active === k)); b.addEventListener('click', () => switchScreen(k)); nav.appendChild(b); });
+}
+function switchScreen(k) { if (display.active === k) return; display.active = k; localStorage.setItem('fp.display', JSON.stringify(display)); lastPortrait = null; fitCanvas(); }
+let lastTouch = 0;
+setInterval(() => { if (effectiveMode(display, config) === 'both' && display.rotateMinutes > 0 && !document.querySelector('.overlay:not([hidden])') && Date.now() - lastTouch > 60_000) switchScreen(display.active === 'family' ? 'command' : 'family'); }, 60_000);
+['pointerdown', 'keydown'].forEach((ev) => document.addEventListener(ev, () => { lastTouch = Date.now(); }, { passive: true }));
 
 /* ---------- toast + LEDs ---------- */
 let toastT;
@@ -122,7 +133,7 @@ async function refreshWx() {
   const tiles = config.house?.tiles || [];
   setPanelAvailable('house', tiles.length > 0); lastPortrait = null; fitCanvas();
   $('house-sub').textContent = st.type === 'homeio' ? 'Home-IO' : 'Home Assistant';
-  if (tiles.length) mountHouse($('house-tiles'), tiles, (s) => led('led-hub', s));
+  if (tiles.length) mountHouse($('house-tiles'), tiles, (s) => led('led-hub', s), { toast });
   if (display.hubSync && st.type === 'homeassistant') startTodoSync(() => listCache.shopping, (s) => led('led-hub', s));
 })();
 

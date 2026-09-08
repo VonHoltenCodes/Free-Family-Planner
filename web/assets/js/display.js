@@ -1,93 +1,107 @@
-// Per-display settings (stored in this browser): panel visibility + order, chores per kid,
-// week start, clock format, units, orientation override, night-dim schedule.
-// Also the layout engine that places the panels on the canvas grid for either orientation.
+// Per-display settings (stored in this browser) and the layout engine.
+// Two SCREENS share one display: "family" (planner) and "command" (home central command), with a
+// mode of family / command / both (tabs, optional auto-rotate). Each screen has its own panel order,
+// hidden set and which panels are shown full-width.
 const LS = 'fp.display';
 const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
 
 export const PANELS = {
-  cal:    { id: 'p-cal',    name: 'Calendar',        width: 'full', h: '1fr' },
+  cal:    { id: 'p-cal',    name: 'Calendar',          width: 'full', h: '1fr' },
   wx:     { id: 'p-wx',     name: 'WeatherStar 4000+', width: 'half', h: '548px', side: 'left' },
-  shop:   { id: 'p-shop',   name: 'Shopping list',   width: 'half', h: '300px', side: 'right' },
-  week:   { id: 'p-week',   name: 'Week ahead',      width: 'full', h: '200px' },
-  meals:  { id: 'p-meals',  name: 'Meal plan',       width: 'full', h: '176px' },
-  chores: { id: 'p-chores', name: 'Chores',          width: 'half', h: '236px', side: 'left' },
-  notes:  { id: 'p-notes',  name: 'Notes',           width: 'half', h: '236px', side: 'right' },
-  house:  { id: 'p-house',  name: 'House (home hub)', width: 'half', h: '236px', side: 'left' },
+  shop:   { id: 'p-shop',   name: 'Shopping list',     width: 'half', h: '300px', side: 'right' },
+  week:   { id: 'p-week',   name: 'Week ahead',        width: 'full', h: '200px' },
+  meals:  { id: 'p-meals',  name: 'Meal plan',         width: 'full', h: '176px' },
+  chores: { id: 'p-chores', name: 'Chores',            width: 'half', h: '236px', side: 'left' },
+  notes:  { id: 'p-notes',  name: 'Notes',             width: 'half', h: '236px', side: 'right' },
+  house:  { id: 'p-house',  name: 'House (home hub)',  width: 'half', h: '236px', side: 'left', wideH: '1fr' },
 };
-const unavailable = new Set(['house']);   // panels that need something configured first
+export const SCREENS = { family: 'Family', command: 'Command' };
+const unavailable = new Set(['house']);
 export function setPanelAvailable(key, ok) { if (ok) unavailable.delete(key); else unavailable.add(key); }
+
+const DEFAULT_SCREENS = {
+  family:  { order: ['cal', 'wx', 'shop', 'week', 'meals', 'chores', 'notes', 'house'], hidden: [], wide: [] },
+  command: { order: ['house', 'wx', 'notes', 'cal', 'week', 'shop', 'meals', 'chores'], hidden: ['shop', 'meals', 'chores'], wide: ['house'] },
+};
 export const DEFAULT_DISPLAY = {
-  order: ['cal', 'wx', 'shop', 'week', 'meals', 'chores', 'notes', 'house'],
-  hidden: [],
-  choresPerKid: 3,
-  weekStart: 0,          // 0 = Sunday, 1 = Monday
-  clock24: false,
-  units: 'us',           // 'us' | 'metric'
-  orientation: 'auto',   // 'auto' | 'portrait' | 'landscape'
-  theme: 'hifi',         // 'hifi' | 'lcars' | 'paper' | 'contrast'
+  mode: null,            // 'family' | 'command' | 'both' — null = follow config.defaultMode
+  active: 'family',
+  rotateMinutes: 0,      // in 'both' mode: auto-switch tabs every N minutes (0 = off)
+  screens: structuredClone(DEFAULT_SCREENS),
+  choresPerKid: 3, weekStart: 0, clock24: false, units: 'us', orientation: 'auto', theme: 'hifi',
   dim: { enabled: false, from: '22:00', to: '06:00', level: 0.85 },
-  hubSync: false,        // this screen runs the shopping-list ↔ hub to-do sync
+  hubSync: false,
 };
 
 export function loadDisplay() {
   let saved = {};
   try { saved = JSON.parse(localStorage.getItem(LS) || 'null') || {}; } catch { /* ignore */ }
-  const d = { ...structuredClone(DEFAULT_DISPLAY), ...saved, dim: { ...DEFAULT_DISPLAY.dim, ...(saved.dim || {}) } };
-  // keep order complete even if new panels were added in an update
-  d.order = [...d.order.filter((k) => PANELS[k]), ...Object.keys(PANELS).filter((k) => !d.order.includes(k))];
-  d.hidden = d.hidden.filter((k) => PANELS[k]);
+  const d = { ...structuredClone(DEFAULT_DISPLAY), ...saved, dim: { ...DEFAULT_DISPLAY.dim, ...(saved.dim || {}) }, screens: structuredClone(DEFAULT_SCREENS) };
+  // migrate v1 (single order/hidden) into the family screen
+  if (saved.order && !saved.screens) { d.screens.family.order = saved.order; d.screens.family.hidden = saved.hidden || []; }
+  if (saved.screens) Object.keys(DEFAULT_SCREENS).forEach((k) => { if (saved.screens[k]) d.screens[k] = { ...DEFAULT_SCREENS[k], ...saved.screens[k] }; });
+  Object.values(d.screens).forEach((s) => { s.order = [...s.order.filter((k) => PANELS[k]), ...Object.keys(PANELS).filter((k) => !s.order.includes(k))]; s.hidden = s.hidden.filter((k) => PANELS[k]); s.wide = (s.wide || []).filter((k) => PANELS[k]); });
+  delete d.order; delete d.hidden;
+  if (!SCREENS[d.active]) d.active = 'family';
   return d;
 }
 export const saveDisplay = (d) => localStorage.setItem(LS, JSON.stringify(d));
-export const THEMES = [['hifi', 'Hi-Fi'], ['lcars', 'LCARS'], ['paper', 'Paper'], ['contrast', 'High contrast']];
-export function applyTheme(d) {
-  const c = document.getElementById('canvas');
-  THEMES.forEach(([k]) => c.classList.remove(`theme-${k}`));
-  if (d.theme && d.theme !== 'hifi') c.classList.add(`theme-${d.theme}`);
-}
+export const effectiveMode = (d, config) => d.mode || config?.defaultMode || 'both';
+export function currentScreen(d, config) { const m = effectiveMode(d, config); return m === 'both' ? d.active : m; }
 
 /* ---------- layout engine ---------- */
 const px = (h) => (h === '1fr' ? 0 : parseInt(h, 10));
-export function applyLayout(d, portrait) {
+/* Rows are ideal pixel heights; if they do not fit the canvas, hand out the space proportionally instead. */
+function fitRows(rows, avail) {
+  const fixed = rows.reduce((n, r) => n + px(r.h), 0); const flex = rows.filter((r) => r.h === '1fr').length;
+  if (fixed + flex * 300 <= avail) return rows.map((r) => r.h).join(' ');
+  const big = Math.max(400, ...rows.map((r) => px(r.h)));
+  return rows.map((r) => `minmax(0, ${(r.h === '1fr' ? big : px(r.h)) / 50}fr)`).join(' ');
+}
+export function applyLayout(d, portrait, screenKey = 'family') {
+  const sc = d.screens[screenKey] || d.screens.family;
   const main = document.querySelector('.main');
-  const visible = d.order.filter((k) => !d.hidden.includes(k) && !unavailable.has(k));
-  Object.entries(PANELS).forEach(([k, p]) => { const e = document.getElementById(p.id); e.hidden = d.hidden.includes(k) || unavailable.has(k); e.style.gridArea = ''; e.style.gridColumn = ''; e.style.gridRow = ''; });
+  const visible = sc.order.filter((k) => !sc.hidden.includes(k) && !unavailable.has(k));
+  const wide = new Set(sc.wide || []);
+  Object.entries(PANELS).forEach(([k, p]) => { const e = document.getElementById(p.id); e.hidden = !visible.includes(k); e.classList.toggle('wide', wide.has(k)); e.style.gridArea = ''; e.style.gridColumn = ''; e.style.gridRow = ''; });
   document.querySelectorAll('.col, .row.bottom').forEach((c) => { c.style.display = ''; c.style.gridTemplateRows = ''; c.style.gridTemplateColumns = ''; c.hidden = false; });
   main.style.gridTemplateRows = ''; main.style.gridTemplateColumns = '';
+  const widthOf = (k) => (wide.has(k) ? 'full' : (!portrait && (k === 'week' || k === 'meals') ? 'half' : PANELS[k].width));
+  const heightOf = (k) => (wide.has(k) && PANELS[k].wideH ? PANELS[k].wideH : PANELS[k].h);
 
   if (portrait) {
-    // rows: full-width panels take a row; two consecutive half panels share one (left/right); a lone half spans both columns
     const rows = []; let i = 0;
     while (i < visible.length) {
-      const a = visible[i]; const A = PANELS[a];
-      if (A.width === 'full') { rows.push({ h: A.h, cells: [[a, '1/3']] }); i += 1; continue; }
-      const b = visible[i + 1]; const B = b && PANELS[b];
-      if (B && B.width === 'half') {
-        const left = (A.side === 'right' && B.side === 'left') ? b : a; const right = left === a ? b : a;
-        rows.push({ h: `${Math.max(px(A.h), px(B.h))}px`, cells: [[left, '1'], [right, '2']] }); i += 2;
-      } else { rows.push({ h: a === 'wx' ? '800px' : A.h, cells: [[a, '1/3']] }); i += 1; }
+      const a = visible[i];
+      if (widthOf(a) === 'full') { rows.push({ h: heightOf(a), cells: [[a, '1/3']] }); i += 1; continue; }
+      const b = visible[i + 1];
+      if (b && widthOf(b) === 'half') {
+        const left = (PANELS[a].side === 'right' && PANELS[b].side === 'left') ? b : a; const right = left === a ? b : a;
+        rows.push({ h: `${Math.max(px(heightOf(a)), px(heightOf(b)))}px`, cells: [[left, '1'], [right, '2']] }); i += 2;
+      } else { rows.push({ h: a === 'wx' ? '800px' : heightOf(a), cells: [[a, '1/3']] }); i += 1; }
     }
     if (!rows.some((r) => r.h === '1fr') && rows.length) rows[rows.length - 1].h = '1fr';
     main.style.gridTemplateColumns = '690px 1fr';
-    main.style.gridTemplateRows = rows.map((r) => r.h).join(' ');
+    main.style.gridTemplateRows = fitRows(rows, 1920 - 60 - 26 - 20 - 16 - (rows.length - 1) * 8);
     rows.forEach((r, ri) => r.cells.forEach(([k, col]) => { const e = document.getElementById(PANELS[k].id); e.style.gridColumn = col; e.style.gridRow = String(ri + 1); }));
     return;
   }
-  // landscape: fixed arrangement (left: cal/week, right: wx/shop, bottom: meals/chores/notes); hidden panels hand their space to neighbours
-  const show = (k) => visible.includes(k);
-  const left = document.querySelector('.col.left'); const right = document.querySelector('.col.right'); const bottom = document.querySelector('.row.bottom');
-  left.style.gridTemplateRows = show('cal') && show('week') ? '1fr 206px' : '1fr';
-  right.style.gridTemplateRows = show('wx') && show('shop') ? '528px 1fr' : '1fr';
-  const leftOn = show('cal') || show('week'); const rightOn = show('wx') || show('shop');
-  left.hidden = !leftOn; right.hidden = !rightOn;
-  const bottomOn = show('meals') || show('chores') || show('notes') || show('house'); bottom.hidden = !bottomOn;
-  main.style.gridTemplateColumns = leftOn && rightOn ? '1176px 1fr' : '1fr';
-  main.style.gridTemplateRows = (leftOn || rightOn) && bottomOn ? '1fr 206px' : '1fr';
-  if (!(leftOn || rightOn)) bottom.style.gridTemplateRows = '';
-  bottom.style.gridColumn = '1/-1';
-  const cols = []; const extra = (show('chores') ? 1 : 0) + (show('notes') ? 1 : 0) + (show('house') ? 1 : 0);
-  if (show('meals')) cols.push('1fr'); ['chores', 'notes', 'house'].forEach((k) => { if (show(k)) cols.push(show('meals') ? (extra >= 3 ? '400px' : k === 'chores' ? '560px' : '460px') : '1fr'); });
-  bottom.style.gridTemplateColumns = cols.join(' ');
+  // landscape: order-driven too — full panels take a row across, halves pair up; each row's height from its panels
+  const cols = document.querySelectorAll('.col, .row.bottom'); cols.forEach((c) => { c.style.display = 'contents'; });
+  const rows = []; let i = 0;
+  while (i < visible.length) {
+    const a = visible[i];
+    if (widthOf(a) === 'full') { rows.push({ h: heightOf(a) === '1fr' ? '1fr' : heightOf(a), cells: [[a, '1/4']] }); i += 1; continue; }
+    const b = visible[i + 1]; const c = visible[i + 2];
+    const halves = [a]; if (b && widthOf(b) === 'half') halves.push(b); if (halves.length === 2 && c && widthOf(c) === 'half' && !['wx', 'house'].includes(a)) halves.push(c);
+    const h = Math.max(...halves.map((k) => (heightOf(k) === '1fr' ? 528 : px(heightOf(k)))));
+    const span = halves.length === 3 ? ['1', '2', '3'] : halves.length === 2 ? ['1/3', '3/4'] : ['1/4'];
+    rows.push({ h: `${Math.min(h, 560)}px`, cells: halves.map((k, j) => [k, span[j]]) }); i += halves.length;
+  }
+  if (!rows.some((r) => r.h === '1fr') && rows.length) rows[0].h = '1fr';
+  main.style.gridTemplateColumns = 'repeat(3, 1fr)';
+  main.style.gridTemplateRows = fitRows(rows, 1080 - 60 - 26 - 20 - 16 - (rows.length - 1) * 8);
+  rows.forEach((r, ri) => r.cells.forEach(([k, col]) => { const e = document.getElementById(PANELS[k].id); e.style.gridColumn = col; e.style.gridRow = String(ri + 1); }));
 }
 
 /* ---------- night dim ---------- */
@@ -105,8 +119,16 @@ export function startDim(d) {
   return tick;
 }
 
+/* ---------- themes ---------- */
+export const THEMES = [['hifi', 'Hi-Fi'], ['lcars', 'LCARS'], ['paper', 'Paper'], ['eink', 'E-ink'], ['contrast', 'High contrast']];
+export function applyTheme(d) {
+  const c = document.getElementById('canvas');
+  THEMES.forEach(([k]) => c.classList.remove(`theme-${k}`));
+  if (d.theme && d.theme !== 'hifi') c.classList.add(`theme-${d.theme}`);
+}
+
 /* ---------- settings dialog ---------- */
-export function openDisplaySettings(d, onChange) {
+export function openDisplaySettings(d, config, onChange) {
   if (document.getElementById('display-overlay')) return;
   const overlay = el('div', 'overlay'); overlay.id = 'display-overlay';
   const dlg = el('div', 'dlg setup display');
@@ -115,21 +137,30 @@ export function openDisplaySettings(d, onChange) {
   const body = el('div', 'form'); dlg.appendChild(body); overlay.appendChild(dlg); document.getElementById('canvas').appendChild(overlay);
   overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
   const commit = () => { saveDisplay(d); onChange(d); };
-
-  body.appendChild(el('p', 'lead', 'These settings live on this display only (saved in this browser). Each screen in the house can be arranged differently.'));
-  // panels
-  body.appendChild(el('div', 'sect', 'Panels — show / hide and order (portrait follows the order; landscape keeps its fixed arrangement)'));
-  const list = el('div', 'panel-list'); body.appendChild(list);
-  const draw = () => { list.innerHTML = ''; d.order.forEach((k, i) => {
-    const row = el('div', 'panel-row');
-    const chk = el('button', 'chk' + (d.hidden.includes(k) ? '' : ' on')); chk.type = 'button'; chk.setAttribute('role', 'switch'); chk.setAttribute('aria-checked', String(!d.hidden.includes(k))); chk.setAttribute('aria-label', `Show ${PANELS[k].name}`); chk.addEventListener('click', () => { d.hidden = d.hidden.includes(k) ? d.hidden.filter((h) => h !== k) : [...d.hidden, k]; draw(); commit(); });
-    const up = el('button', 'btn sm', '▲'); up.type = 'button'; up.disabled = i === 0; up.addEventListener('click', () => { [d.order[i - 1], d.order[i]] = [d.order[i], d.order[i - 1]]; draw(); commit(); });
-    const dn = el('button', 'btn sm', '▼'); dn.type = 'button'; dn.disabled = i === d.order.length - 1; dn.addEventListener('click', () => { [d.order[i + 1], d.order[i]] = [d.order[i], d.order[i + 1]]; draw(); commit(); });
-    row.append(chk, el('span', 'pname', PANELS[k].name), el('span', 'grow'), up, dn); list.appendChild(row); }); };
-  draw();
   const opt = (label, options, value, set) => { const wrap = el('div', 'opt'); wrap.appendChild(el('span', 'k', label)); const grp = el('div', 'seg');
     options.forEach(([v, name]) => { const b = el('button', 'btn sm' + (v === value ? ' on' : ''), name); b.type = 'button'; b.addEventListener('click', () => { set(v); grp.querySelectorAll('.btn').forEach((q) => q.classList.remove('on')); b.classList.add('on'); commit(); }); grp.appendChild(b); });
     wrap.appendChild(grp); return wrap; };
+
+  body.appendChild(el('p', 'lead', 'These settings live on this display only (saved in this browser). Each screen in the house can be arranged differently.'));
+  body.appendChild(el('div', 'sect', 'Screens'));
+  const mode = effectiveMode(d, config);
+  body.appendChild(opt('Show', [['family', 'Family planner'], ['command', 'Home command'], ['both', 'Both (tabs)']], mode, (v) => { d.mode = v; if (v !== 'both') d.active = v; }));
+  body.appendChild(opt('Auto-switch tabs', [[0, 'Off'], [2, '2 min'], [5, '5 min'], [10, '10 min']], d.rotateMinutes, (v) => { d.rotateMinutes = v; }));
+  // per-screen panel editor
+  let editing = currentScreen(d, config);
+  body.appendChild(el('div', 'sect', 'Panels — show / hide, order, and width, per screen'));
+  const pick = el('div', 'seg'); const list = el('div', 'panel-list');
+  const drawPick = () => { pick.innerHTML = ''; Object.entries(SCREENS).forEach(([k, name]) => { const b = el('button', 'btn sm' + (k === editing ? ' on' : ''), `${name} screen`); b.type = 'button'; b.addEventListener('click', () => { editing = k; drawPick(); draw(); }); pick.appendChild(b); }); };
+  const draw = () => { const sc = d.screens[editing]; list.innerHTML = ''; sc.order.forEach((k, i) => {
+    const row = el('div', 'panel-row');
+    const chk = el('button', 'chk' + (sc.hidden.includes(k) ? '' : ' on')); chk.type = 'button'; chk.setAttribute('role', 'switch'); chk.setAttribute('aria-checked', String(!sc.hidden.includes(k))); chk.setAttribute('aria-label', `Show ${PANELS[k].name}`);
+    chk.addEventListener('click', () => { sc.hidden = sc.hidden.includes(k) ? sc.hidden.filter((h) => h !== k) : [...sc.hidden, k]; draw(); commit(); });
+    const wideB = el('button', 'btn sm' + (sc.wide.includes(k) ? ' on' : ''), 'Wide'); wideB.type = 'button'; wideB.title = 'Full width'; wideB.disabled = PANELS[k].width === 'full';
+    wideB.addEventListener('click', () => { sc.wide = sc.wide.includes(k) ? sc.wide.filter((w) => w !== k) : [...sc.wide, k]; draw(); commit(); });
+    const up = el('button', 'btn sm', '▲'); up.type = 'button'; up.disabled = i === 0; up.addEventListener('click', () => { [sc.order[i - 1], sc.order[i]] = [sc.order[i], sc.order[i - 1]]; draw(); commit(); });
+    const dn = el('button', 'btn sm', '▼'); dn.type = 'button'; dn.disabled = i === sc.order.length - 1; dn.addEventListener('click', () => { [sc.order[i + 1], sc.order[i]] = [sc.order[i], sc.order[i + 1]]; draw(); commit(); });
+    row.append(chk, el('span', 'pname', PANELS[k].name), el('span', 'grow'), wideB, up, dn); list.appendChild(row); }); };
+  drawPick(); draw(); body.append(pick, list);
   body.appendChild(el('div', 'sect', 'Theme'));
   body.appendChild(opt('Theme', THEMES, d.theme, (v) => { d.theme = v; applyTheme(d); }));
   body.appendChild(el('div', 'sect', 'Behaviour'));
@@ -148,7 +179,7 @@ export function openDisplaySettings(d, onChange) {
   dimRow.append(dchk, el('span', 'k', 'Dim from'), from, el('span', 'k', 'until'), to); body.appendChild(dimRow);
   body.appendChild(opt('Dim level', [[0.6, 'Soft'], [0.85, 'Dark'], [0.97, 'Off-ish']], d.dim.level, (v) => { d.dim.level = v; }));
   const actions = el('div', 'actions'); const reset = el('button', 'btn danger left', 'Reset to defaults'); reset.type = 'button';
-  reset.addEventListener('click', () => { Object.assign(d, structuredClone(DEFAULT_DISPLAY)); commit(); overlay.remove(); openDisplaySettings(d, onChange); });
+  reset.addEventListener('click', () => { Object.assign(d, structuredClone(DEFAULT_DISPLAY)); commit(); overlay.remove(); openDisplaySettings(d, config, onChange); });
   const done = el('button', 'btn on', 'Done'); done.type = 'button'; done.addEventListener('click', () => overlay.remove());
   actions.append(reset, done); dlg.appendChild(actions);
 }

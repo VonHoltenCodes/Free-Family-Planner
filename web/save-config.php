@@ -31,7 +31,7 @@ if (!is_array($cfg) || !isset($cfg['family']) || !isset($cfg['location'])) {
     http_response_code(400); echo json_encode(['error' => 'invalid config']); exit;
 }
 // keep only the keys the app knows about; everything is plain data, no code
-$allowed = ['family', 'location', 'firebase', 'googleClientId', 'holidayCalendarId', 'backend', 'calendars', 'weather', 'house'];
+$allowed = ['family', 'location', 'firebase', 'googleClientId', 'holidayCalendarId', 'backend', 'calendars', 'weather', 'house', 'defaultMode'];
 $clean = [];
 foreach ($allowed as $k) { if (array_key_exists($k, $cfg)) $clean[$k] = $cfg[$k]; }
 

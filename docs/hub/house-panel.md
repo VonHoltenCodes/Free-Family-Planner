@@ -24,10 +24,18 @@ Supported kinds, inferred automatically:
 | `lock.*` | LOCKED / UNLOCKED (amber) |
 | `switch.*`, `light.*`, `input_boolean.*` | ON / OFF (+ brightness) |
 | `cover.*` | OPEN / CLOSED |
+| `camera.*` | a live still, refreshed every 15 s (through your server, token never in the page) |
+| `media_player.*` | PLAYING / PAUSED / OFF and what is playing |
+| `fan.*` | ON / OFF |
 | `sensor.*`, anything else | value with its unit |
 
 Tiles refresh every 15 s. The panel appears once at least one tile is picked; order and visibility
-follow ☰ Display like every other panel. Read-only for now.
+follow ☰ Display like every other panel.
+
+**Tap to control:** in the wizard, tiles for lights, switches, fans, covers and locks have a *Tap to control*
+toggle (on by default for lights, switches, fans and covers; off for locks). Lights/switches/fans toggle,
+covers open or close, locks ask for confirmation first. On the **Command** screen the House panel is
+full width with bigger tiles; see the README on Family / Command screens.
 
 ## Shopping-list sync
 Home Assistant's built-in **Shopping list** (`todo.shopping_list`) is what voice assistants feed.
