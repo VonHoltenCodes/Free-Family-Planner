@@ -145,6 +145,12 @@ tools/build-ws4kp.sh
 deploy.sh, deploy.env.example
 ```
 
+## Home Assistant and other hubs
+The planner publishes a read-only snapshot at `/api/state` (tonight's dinner, open shopping items,
+chores done, next events, outside temperature). Home Assistant's built-in REST sensor reads it with a
+few lines of YAML — see [docs/hub/home-assistant.md](docs/hub/home-assistant.md). Hosted installs
+protect it with a token.
+
 ## Accessibility
 Keyboard-navigable (Tab through panels, Enter/Space on days and events), screen-reader landmarks and
 switch states, visible focus rings, `prefers-reduced-motion` support, and touch-sized targets on the

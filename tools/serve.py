@@ -17,6 +17,7 @@ import urllib.request
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'web')
 DATA_DIR = os.environ.get('FP_DATA_DIR') or os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'data')
 DB_FILE = os.path.join(DATA_DIR, 'planner.json')
+STATE_FILE = os.path.join(DATA_DIR, 'state.json')
 _db_lock = threading.Lock()
 COLLECTIONS = ('notes', 'shopping', 'settings', 'chores', 'events')
 
@@ -25,6 +26,27 @@ def _db_load():
         with open(DB_FILE) as f: db = json.load(f)
     except (OSError, ValueError): db = {}
     db.setdefault('rev', 0); db.setdefault('data', {}); return db
+
+FULL_DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+
+def derive_state(db):
+    """Snapshot from the sync store alone (no display has published yet): meals, lists, chores, local events."""
+    import datetime as dt
+    d = db.get('data', {}); today = FULL_DAYS[(dt.date.today().weekday() + 1) % 7]
+    meals = d.get('settings', {}).get('weeklyMeals', {})
+    lst = lambda col: (lambda items: {'open': sum(1 for i in items if not i.get('completed')), 'total': len(items), 'items': [{'text': i.get('text', ''), 'completed': bool(i.get('completed'))} for i in items]})(sorted(d.get(col, {}).values(), key=lambda i: i.get('createdAt', ''), reverse=True))
+    kids = {}
+    try:
+        cfg = re.search(r'export default (\{.*\});', open(os.path.join(ROOT, 'config.js')).read(), re.S); kids = {k['id']: k.get('name', k['id']) for k in json.loads(cfg.group(1)).get('family', {}).get('kids', [])} if cfg else {}
+    except (OSError, ValueError, AttributeError): pass
+    chores = {}
+    for kid, doc in d.get('chores', {}).items():
+        items = [c for c in doc.get('items', []) if c.get('text')]
+        chores[kid] = {'name': kids.get(kid, kid), 'done': sum(1 for c in items if c.get('completed')), 'total': len(items), 'items': [{'text': c['text'], 'completed': bool(c.get('completed'))} for c in items]}
+    now = dt.datetime.now().isoformat()
+    evs = sorted([{'summary': e.get('summary', ''), 'calendar': 'Family', 'allDay': bool(e.get('allDay')), 'start': e.get('start'), 'end': e.get('end'), 'location': e.get('location', '')} for e in d.get('events', {}).values() if (e.get('end') or '') >= now[:10]], key=lambda e: e['start'] or '')[:8]
+    return {'updatedAt': None, 'source': 'store', 'family': {}, 'meals': {'today': meals.get(today, ''), 'todayName': today, 'week': {k: meals.get(k, '') for k in FULL_DAYS}},
+            'shopping': lst('shopping'), 'notes': lst('notes'), 'chores': chores, 'events': evs, 'weather': None}
 
 def _db_save(db):
     os.makedirs(DATA_DIR, exist_ok=True); tmp = DB_FILE + '.tmp'
@@ -57,7 +79,28 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             else: return self._json(405, {'error': 'method'})
             db['rev'] += 1; _db_save(db); return self._json(200, {'rev': db['rev']})
 
-    def do_PUT(self): return self._db() if self.path.startswith('/api/db.php') else self.send_error(404)
+    def _state(self):
+        """Read-only snapshot for home hubs (Home Assistant REST sensor, Home-IO). The display PUTs it;
+        without a snapshot we derive what we can from the sync store."""
+        if self.command == 'PUT':
+            try:
+                snap = json.loads(self.rfile.read(int(self.headers.get('Content-Length', '0')) or b'{}'))
+                if not isinstance(snap, dict) or 'meals' not in snap: raise ValueError('bad snapshot')
+            except ValueError as e: return self._json(400, {'error': str(e)})
+            os.makedirs(DATA_DIR, exist_ok=True)
+            with open(STATE_FILE + '.tmp', 'w') as f: json.dump(snap, f)
+            os.replace(STATE_FILE + '.tmp', STATE_FILE); return self._json(200, {'ok': True})
+        try:
+            with open(STATE_FILE) as f: snap = json.load(f)
+        except (OSError, ValueError): snap = None
+        if snap is None: snap = derive_state(_db_load())
+        self.send_response(200); self.send_header('Content-Type', 'application/json'); self.send_header('Access-Control-Allow-Origin', '*')
+        body = json.dumps(snap).encode(); self.send_header('Content-Length', str(len(body))); self.end_headers(); self.wfile.write(body)
+
+    def do_PUT(self):
+        if self.path.startswith('/api/db.php'): return self._db()
+        if self.path.startswith('/api/state'): return self._state()
+        return self.send_error(404)
     def do_DELETE(self): return self._db() if self.path.startswith('/api/db.php') else self.send_error(404)
 
     def _ics_proxy(self):
@@ -75,9 +118,10 @@ class Handler(http.server.SimpleHTTPRequestHandler):
     def do_GET(self):
         if self.path.startswith('/api/db.php'): return self._db()
         if self.path.startswith('/api/ics.php'): return self._ics_proxy()
+        if self.path.split('?')[0] in ('/api/state', '/api/state.php'): return self._state()
         if self.path in ('/', '/index.php', '/index.html'):
             self.path = '/app.html'
-        if self.path.startswith('/includes/') or self.path.startswith('/api/'):
+        if self.path.startswith('/includes/') or (self.path.startswith('/api/') and not self.path.split('?')[0] in ('/api/state', '/api/state.php')):
             self.send_error(403); return
         return super().do_GET()
     def do_POST(self):
