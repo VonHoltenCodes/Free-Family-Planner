@@ -6,6 +6,8 @@
  * includes/auth_config.php) — for CLIs, agents and automations.
  */
 if (!defined('FP_AUTH')) define('FP_AUTH', true);
+require_once __DIR__ . '/_access.php';
+if (!fp_auth_exists()) { header('Content-Type: application/json'); http_response_code(409); echo json_encode(['error' => 'no login yet — open setup-login.php in a browser first']); exit; }
 require_once __DIR__ . '/../includes/auth_config.php';
 header('Content-Type: application/json'); header('Cache-Control: no-store');
 $tok = defined('FP_API_TOKEN') ? FP_API_TOKEN : '';
@@ -21,7 +23,7 @@ $m = $_SERVER['REQUEST_METHOD']; $path = trim($_GET['path'] ?? '', '/'); $parts 
 $body = in_array($m, ['POST', 'PUT', 'PATCH'], true) ? json_decode(file_get_contents('php://input'), true) : [];
 if (in_array($m, ['POST', 'PUT', 'PATCH'], true) && !is_array($body)) $body = [];
 $dir = __DIR__ . '/../includes/data'; if (!is_dir($dir)) @mkdir($dir, 0750, true);
-$ROUTES = ['GET /api/v1', 'GET|PUT|PATCH /api/v1/config', 'GET|PUT|POST /api/v1/tiles, DELETE /api/v1/tiles/{entity}', 'GET|PUT|PATCH /api/v1/hub', 'GET /api/v1/hub/test', 'GET /api/v1/hub/entities[?domain=]', 'GET /api/v1/hub/states?ids=a,b', 'POST /api/v1/hub/call {entity,action}', 'GET /api/v1/hub/calendars', 'GET|POST|PATCH|DELETE /api/v1/hub/todo', 'GET|POST /api/v1/lists/{shopping|notes}, PATCH|DELETE /api/v1/lists/{col}/{id}', 'GET|PUT|PATCH /api/v1/meals', 'GET /api/v1/chores, GET|PUT /api/v1/chores/{kid}', 'GET|POST /api/v1/events, PUT|PATCH|DELETE /api/v1/events/{id}', 'GET /api/v1/state', 'GET /api/v1/power'];
+$ROUTES = ['GET /api/v1', 'GET|PUT|PATCH /api/v1/access', 'GET|PUT|PATCH /api/v1/config', 'GET|PUT|POST /api/v1/tiles, DELETE /api/v1/tiles/{entity}', 'GET|PUT|PATCH /api/v1/hub', 'GET /api/v1/hub/test', 'GET /api/v1/hub/entities[?domain=]', 'GET /api/v1/hub/states?ids=a,b', 'POST /api/v1/hub/call {entity,action}', 'GET /api/v1/hub/calendars', 'GET|POST|PATCH|DELETE /api/v1/hub/todo', 'GET|POST /api/v1/lists/{shopping|notes}, PATCH|DELETE /api/v1/lists/{col}/{id}', 'GET|PUT|PATCH /api/v1/meals', 'GET /api/v1/chores, GET|PUT /api/v1/chores/{kid}', 'GET|POST /api/v1/events, PUT|PATCH|DELETE /api/v1/events/{id}', 'GET /api/v1/state', 'GET /api/v1/power'];
 $CONFIG_KEYS = ['family', 'location', 'firebase', 'googleClientId', 'holidayCalendarId', 'backend', 'calendars', 'weather', 'house', 'defaultMode', 'defaultTab', 'power'];
 
 // ---- helpers ----
@@ -102,6 +104,21 @@ try {
             $id = $parts[1] ?? ''; if (!isset($d['events'][$id])) $out(404, ['error' => 'unknown event']);
             if ($m === 'PUT' || $m === 'PATCH') { foreach (['summary', 'location', 'description', 'allDay', 'start', 'end'] as $k) if (array_key_exists($k, $body)) $d['events'][$id][$k] = $body[$k]; $d['events'][$id]['updatedAt'] = now_iso(); db_save($db); $out(200, ['id' => $id] + $d['events'][$id]); }
             if ($m === 'DELETE') { unset($d['events'][$id]); db_save($db); $out(200, ['ok' => true]); } } }
+    if ($head === 'access') {
+        $c = fp_auth_read_constants();
+        if ($m === 'GET') $out(200, ['mode' => 'hosted', 'username' => $c['FP_USERNAME'] ?? '', 'hasApiToken' => !empty($c['FP_API_TOKEN']), 'hasStateToken' => !empty($c['FP_STATE_TOKEN']), 'sessionDays' => (int)(($c['FP_SESSION_LIFETIME'] ?? 604800) / 86400)]);
+        if ($m === 'PUT' || $m === 'PATCH') {
+            if ($byToken && (isset($body['password']) || isset($body['username']))) $out(403, ['error' => 'changing the login needs the site login, not the API token']);
+            $resp = ['ok' => true];
+            if (isset($body['username'])) { if (!preg_match('/^[A-Za-z0-9._@-]{2,64}$/', $body['username'])) $out(400, ['error' => 'bad username']); $c['FP_USERNAME'] = $body['username']; }
+            if (isset($body['password'])) { if (strlen($body['password']) < 8) $out(400, ['error' => 'password must be at least 8 characters']); $c['FP_PASSWORD_HASH'] = password_hash($body['password'], PASSWORD_DEFAULT); }
+            if (array_key_exists('apiToken', $body)) { $t = $body['apiToken']; if ($t === 'generate') { $t = bin2hex(random_bytes(24)); $resp['apiToken'] = $t; } $c['FP_API_TOKEN'] = $t === null ? '' : $t; }
+            if (array_key_exists('stateToken', $body)) { $t = $body['stateToken']; if ($t === 'generate') { $t = bin2hex(random_bytes(16)); $resp['stateToken'] = $t; } $c['FP_STATE_TOKEN'] = $t === null ? '' : $t; }
+            if (isset($body['sessionDays'])) $c['FP_SESSION_LIFETIME'] = max(1, (int)$body['sessionDays']) * 86400;
+            fp_auth_write($c); $out(200, $resp);
+        }
+        $out(405, ['error' => 'GET, PUT or PATCH']);
+    }
     if ($head === 'state' && $m === 'GET') { define('FP_API_INTERNAL', true); include __DIR__ . '/state.php'; exit; }
     if ($head === 'power' && $m === 'GET') { define('FP_API_INTERNAL', true); include __DIR__ . '/power.php'; exit; }
     $out(404, ['error' => 'unknown route — GET /api/v1 lists them']);

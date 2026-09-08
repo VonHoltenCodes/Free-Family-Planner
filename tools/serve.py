@@ -58,7 +58,7 @@ def comed_prices():
 class ApiError(Exception):
     def __init__(self, code, msg): super().__init__(msg); self.code = code
 
-V1_ROUTES = ['GET /api/v1', 'GET|PUT|PATCH /api/v1/config', 'GET|PUT|POST /api/v1/tiles, DELETE /api/v1/tiles/{entity}',
+V1_ROUTES = ['GET /api/v1', 'GET|PUT|PATCH /api/v1/access', 'GET|PUT|PATCH /api/v1/config', 'GET|PUT|POST /api/v1/tiles, DELETE /api/v1/tiles/{entity}',
              'GET|PUT|PATCH /api/v1/hub', 'GET /api/v1/hub/test', 'GET /api/v1/hub/entities[?domain=]', 'GET /api/v1/hub/states?ids=a,b', 'POST /api/v1/hub/call {entity,action}',
              'GET /api/v1/hub/calendars', 'GET|POST|PATCH|DELETE /api/v1/hub/todo', 'GET|POST /api/v1/lists/{shopping|notes}, PATCH|DELETE /api/v1/lists/{col}/{id}',
              'GET|PUT|PATCH /api/v1/meals', 'GET /api/v1/chores, GET|PUT /api/v1/chores/{kid}', 'GET|POST /api/v1/events, PUT|PATCH|DELETE /api/v1/events/{id}', 'GET /api/v1/state', 'GET /api/v1/power']
@@ -203,7 +203,8 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         return self.headers.get('Authorization', '') == f'Bearer {tok}' or parse_qs(urlsplit(self.path).query).get('token', [''])[0] == tok
 
     def _v1(self):
-        if not self._v1_auth(): return self._json(401, {'error': 'missing or wrong API token (Authorization: Bearer …)'})
+        # /api/v1/access is never token-gated on a local-host install: the page's own wizard manages the token, and the LAN is trusted anyway
+        if not urlsplit(self.path).path.rstrip('/').endswith('/api/v1/access') and not self._v1_auth(): return self._json(401, {'error': 'missing or wrong API token (Authorization: Bearer …)'})
         u = urlsplit(self.path); parts = [p for p in u.path.split('/')[3:] if p]; q = {k: v[0] for k, v in parse_qs(u.query).items()}; m = self.command
         body = {}
         if m in ('POST', 'PUT', 'PATCH'):
@@ -288,6 +289,25 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                         if m in ('PUT', 'PATCH'): evs[parts[1]].update({k: v for k, v in body.items() if k in ('summary', 'location', 'description', 'allDay', 'start', 'end')}); evs[parts[1]]['updatedAt'] = now_iso(); commit(); return J(200, {'id': parts[1], **evs[parts[1]]})
                         if m == 'DELETE': del evs[parts[1]]; commit(); return J(200, {'ok': True})
                     raise ApiError(404, 'unknown event')
+        if head == 'access':
+            has = os.path.isfile(API_TOKEN_FILE)
+            if m == 'GET': return J(200, {'mode': 'local', 'username': None, 'hasApiToken': has, 'note': 'local-host install: no login page (trusted LAN); an API token protects /api/v1 only'})
+            if m in ('PUT', 'PATCH'):
+                resp = {'ok': True}
+                if 'apiToken' in body:
+                    t = body['apiToken']
+                    if t == 'generate': import secrets; t = secrets.token_hex(24); resp['apiToken'] = t
+                    os.makedirs(DATA_DIR, exist_ok=True)
+                    if t is None or t == '':
+                        try: os.remove(API_TOKEN_FILE)
+                        except OSError: pass
+                    else:
+                        with open(API_TOKEN_FILE, 'w') as f: f.write(t)
+                        try: os.chmod(API_TOKEN_FILE, 0o600)
+                        except OSError: pass
+                if 'password' in body or 'username' in body: resp['note'] = 'no login on a local-host install; use the hosted (PHP) install for a password-protected page'
+                return J(200, resp)
+            raise ApiError(405, 'GET, PUT or PATCH')
         if head == 'state' and m == 'GET':
             try:
                 with open(STATE_FILE) as f: return J(200, json.load(f))

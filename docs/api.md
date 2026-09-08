@@ -29,6 +29,14 @@ to use the site login (cookie saved in `~/.config/ffp`).
 
 ## Routes
 
+### Access (login + tokens)
+| | |
+|---|---|
+| `GET /access` | `{mode:"hosted"|"local", username, hasApiToken, hasStateToken, sessionDays}` |
+| `PATCH /access` | (on local installs this route is never token-gated — the wizard manages the token from the page) hosted: `{"username","password","apiToken":"generate"|"<value>"|null,"stateToken":…,"sessionDays"}`; local: `{"apiToken":…}` only (no login page on a LAN install). A generated token is returned once. Changing the login requires the site login session, not the API token. |
+
+Hosted installs create their first login on `setup-login.php`, which the app redirects to until `includes/auth_config.php` exists.
+
 ### Site config (`config.js`)
 | | |
 |---|---|

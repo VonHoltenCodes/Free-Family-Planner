@@ -45,6 +45,10 @@ Everything runs in the browser. There are two ways to run it:
 - **This device only**: everything in the browser's storage. Zero setup, no sync.
 
 ### 2. Calendars
+Want something on the grid before you connect anything? Every install serves a **demo feed** of
+fictional family events at `demo/family-demo.ics` — add it as an ICS feed in the wizard (URL:
+your planner address + `/demo/family-demo.ics`). Handy for showcasing without exposing a real calendar.
+
 The wizard's Calendars step: the local family calendar is on by default; add iCal/ICS feed URLs
 (iCloud public calendar, Google "secret address in iCal format", Outlook publish, school/sports
 "subscribe" links — use `https://`, not `webcal://`); when a Home Assistant hub is connected, its
@@ -67,14 +71,13 @@ status bar. It writes `web/config.js` on the server when it can (hosted PHP inst
 
 Prefer a file? `cp web/config.example.js web/config.js` and edit it — same keys.
 
-For the hosted install also create the login:
-```sh
-cp web/includes/auth_config.example.php web/includes/auth_config.php
-php -r 'echo password_hash("your-password", PASSWORD_DEFAULT), PHP_EOL;'   # paste into auth_config.php
-```
-Both files are gitignored. `config.js` is served to the browser (Firebase web keys and OAuth
-client IDs are public identifiers by design); `auth_config.php` is never served. For the wizard to
-save on a hosted install, the web server user must be able to write `web/config.js`.
+On a hosted install the first visit opens **Create your login** (username + password); after that,
+⚙ Setup → **Access** changes the login and generates API tokens. (The old manual route still works:
+copy `web/includes/auth_config.example.php` and paste a `password_hash()` — see the file.)
+Both `config.js` and `auth_config.php` are gitignored. `config.js` is served to the browser (Firebase
+web keys and OAuth client IDs are public identifiers by design); `auth_config.php` is never served.
+For the wizard to save on a hosted install, the web server user must be able to write `web/config.js`
+and `web/includes/`.
 
 ### 4. WeatherStar 4000+ bundle
 ```sh
