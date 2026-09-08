@@ -593,7 +593,7 @@ select option{background:var(--panel);color:var(--text);}
 .canvas.kbd{transition:transform .15s ease-out;}
 
 /* ---------- House panel (home hub tiles) ---------- */
-.tiles{flex:1;min-height:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));grid-auto-rows:minmax(84px,1fr);gap:6px;overflow:hidden;}
+.tiles{flex:1;min-height:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));grid-auto-rows:96px;align-content:start;gap:6px;overflow:hidden;}
 .tile{display:flex;flex-direction:column;justify-content:center;gap:2px;padding:6px 10px;background:var(--panel-2);border:1px solid var(--grid-line);border-left:4px solid var(--text-mute);border-radius:3px;min-width:0;}
 .tile.on{border-left-color:var(--grn);}
 .tile.warn{border-left-color:var(--amber);}
@@ -626,7 +626,7 @@ select option{background:var(--panel);color:var(--text);}
 .canvas.theme-contrast .tabs .tab{background:#333;color:#fff;border:1px solid #fff;}
 .canvas.theme-contrast .tabs .tab.on{background:#ff0;color:#000;}
 /* wide (full-width) House panel: bigger, tappable tiles */
-.panel.wide .tiles{grid-template-columns:repeat(auto-fill,minmax(210px,1fr));grid-auto-rows:minmax(120px,1fr);gap:8px;}
+.panel.wide .tiles{grid-template-columns:repeat(auto-fill,minmax(210px,1fr));grid-auto-rows:150px;align-content:start;gap:8px;}
 .panel.wide .tile .tb{font-size:38px;}
 .panel.wide .tile.presence .tb,.panel.wide .tile.door .tb,.panel.wide .tile.lock .tb,.panel.wide .tile.onoff .tb,.panel.wide .tile.motion .tb,.panel.wide .tile.cover .tb,.panel.wide .tile.media .tb{font-size:28px;}
 .panel.wide .tile.climate .tb,.panel.wide .tile.weather .tb{font-size:34px;}
