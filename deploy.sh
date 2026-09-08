@@ -12,7 +12,15 @@ STAGE="${STAGE:-/tmp/family-planner-stage}"
 [ -d "$HERE/web/ws4kp/resources" ] || { echo "web/ws4kp/ missing — run tools/build-ws4kp.sh first"; exit 1; }
 [ -f "$HERE/web/config.js" ] || { echo "web/config.js missing — copy web/config.example.js and fill it in"; exit 1; }
 
-rsync -a --delete --exclude 'includes/' "$HERE/web/" "$SSH_HOST:$STAGE/"
+# Stage locally and stamp every module import + asset reference with the commit version so the wall
+# display never mixes cached old modules with new ones (internal imports have no query string in git).
+LOCAL_STAGE="$(mktemp -d)"
+rsync -a --exclude 'includes/' "$HERE/web/" "$LOCAL_STAGE/"
+V="$(git -C "$HERE" rev-parse --short HEAD 2>/dev/null || date +%s)"
+find "$LOCAL_STAGE/assets/js" -name '*.js' -exec sed -i -E "s#(from '\./[a-z0-9_./-]+\.js)(\?v=[0-9]+)?'#\1?v=$V'#g; s#(import\('\./[a-z0-9_./-]+\.js)(\?v=[0-9]+)?'#\1?v=$V'#g; s#(from '\.\./\.\./config\.js)#\1#g" {} +
+sed -i -E "s#(assets/(css|js)/[a-z-]+\.(css|js))(\?v=[0-9]+)?#\1?v=$V#g" "$LOCAL_STAGE/app.html"
+rsync -a --delete "$LOCAL_STAGE/" "$SSH_HOST:$STAGE/"
+rm -rf "$LOCAL_STAGE"
 if [ -n "${SUDO_PASS:-}" ]; then
   printf '%s\n' "$SUDO_PASS" | ssh "$SSH_HOST" "sudo -S -p '' bash -c '
     set -e
