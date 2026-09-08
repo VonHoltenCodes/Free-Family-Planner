@@ -1,0 +1,45 @@
+name: Bug report
+description: Something is broken or looks wrong
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: Thanks — a screenshot and the details below usually get it fixed quickly. Please don't paste your config.js.
+  - type: dropdown
+    id: mode
+    attributes:
+      label: How are you running it?
+      options: [Local-host (tools/serve.py), Docker, Hosted (PHP login), Not sure]
+    validations: { required: true }
+  - type: input
+    id: device
+    attributes:
+      label: Display device and browser
+      placeholder: e.g. Fire HD 10 + Fully Kiosk, Pi 4 + Chromium, iPhone Safari
+    validations: { required: true }
+  - type: dropdown
+    id: orientation
+    attributes:
+      label: Orientation
+      options: [Portrait, Landscape, Both]
+  - type: dropdown
+    id: area
+    attributes:
+      label: Which part?
+      options: [Setup wizard, Display settings / layout, Themes, Calendar (Google), Calendar (ICS feed), Calendar (local), Shopping / notes / meals / chores, Data sync, WeatherStar / weather card, Login page (hosted), Docker / install, Other]
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and what did you expect?
+      description: Steps to reproduce if you can. Attach a screenshot.
+    validations: { required: true }
+  - type: textarea
+    id: console
+    attributes:
+      label: Browser console or server log lines (if any)
+      render: text
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      placeholder: v0.1.0, or the commit hash

@@ -1,0 +1,22 @@
+name: Install / setup help
+description: Stuck getting it running (wizard, Google, Firebase, feeds, kiosk)
+labels: [question]
+body:
+  - type: dropdown
+    id: mode
+    attributes:
+      label: Install type
+      options: [Local-host (tools/serve.py), Docker, Hosted (PHP), Raspberry Pi kiosk, Android / Fire tablet]
+    validations: { required: true }
+  - type: dropdown
+    id: step
+    attributes:
+      label: Where are you stuck?
+      options: [Building the WeatherStar bundle, Setup wizard, Google Calendar sign-in, Firebase / data store, ICS feed, Login page (hosted), Kiosk / fullscreen, Something else]
+    validations: { required: true }
+  - type: textarea
+    id: details
+    attributes:
+      label: What you did and what you saw
+      description: Exact error text helps. Don't paste keys or your config.js.
+    validations: { required: true }

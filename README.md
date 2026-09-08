@@ -155,6 +155,10 @@ of shrinking the whole layout.
 See [ROADMAP.md](ROADMAP.md) — the first roadmap is complete. New ideas go in Issues; work happens
 on `feat/*` branches with a PR per feature.
 
+## Contributing
+Issues and PRs welcome — see [CONTRIBUTING.md](CONTRIBUTING.md) for the ground rules (no secrets,
+both run modes must keep working, no frameworks) and how to test.
+
 ## Credits
 - [WeatherStar 4000+ (ws4kp)](https://github.com/netbymatt/ws4kp) by Matt Walsh — MIT.
 - Fonts: [Saira](https://fonts.google.com/specimen/Saira), [Pixelify Sans](https://fonts.google.com/specimen/Pixelify+Sans)

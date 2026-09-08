@@ -1,0 +1,27 @@
+name: Feature request
+description: An idea for the planner
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What would this help your family do?
+      description: The situation on the wall, not the implementation.
+    validations: { required: true }
+  - type: textarea
+    id: idea
+    attributes:
+      label: Your idea
+      description: How you picture it working. Sketches welcome.
+  - type: dropdown
+    id: mode
+    attributes:
+      label: Should work in
+      options: [Both local-host and hosted, Local-host only is fine, Hosted only is fine]
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checks
+      options:
+        - label: I searched existing issues and the ROADMAP
+        - label: This does not need a cloud account or a paid service to work

@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Roadmap
+    url: https://github.com/VonHoltenCodes/Free-Family-Planner/blob/main/ROADMAP.md
+    about: What has shipped and what is planned
+  - name: Kiosk guides
+    url: https://github.com/VonHoltenCodes/Free-Family-Planner/tree/main/docs/kiosk
+    about: Android / Fire tablet, Raspberry Pi and Docker setups
