@@ -24,7 +24,8 @@ const DEFAULT_SCREENS = {
   // Family = the planner exactly as it was; house + electricity live on the Command tab
   family:  { v: 2, order: ['cal', 'wx', 'shop', 'week', 'meals', 'chores', 'notes', 'power', 'house'], hidden: ['power', 'house'], wide: [] },
   // Command = the house: controls first; weather, lists, meals, chores and notes live on the Family tab
-  command: { v: 3, order: ['house', 'power', 'cal', 'week', 'wx', 'notes', 'shop', 'meals', 'chores'], hidden: ['wx', 'notes', 'shop', 'meals', 'chores'], wide: ['house'] },
+  // Command = the house only: controls + electricity. Add anything else per screen in ☰ Display.
+  command: { v: 4, order: ['house', 'power', 'cal', 'week', 'wx', 'notes', 'shop', 'meals', 'chores'], hidden: ['cal', 'week', 'wx', 'notes', 'shop', 'meals', 'chores'], wide: ['house', 'power'] },
 };
 export const DEFAULT_DISPLAY = {
   mode: null,            // 'family' | 'command' | 'both' — null = follow config.defaultMode

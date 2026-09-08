@@ -112,8 +112,7 @@ Firestore, NWS and WeatherStar work locally; Google sign-in only works on an aut
 
 ## Two faces: Family Planner and Home Central Command
 The same display is both a **family planner** (calendar, lists, meals, chores, weather) and a **home
-central command** (a big House panel of tappable controls from your hub, electricity prices, the
-calendar). FAMILY and COMMAND tabs sit in the status bar; the wizard picks the default tab and ☰
+central command** (a big House panel of tappable controls from your hub and the electricity prices). FAMILY and COMMAND tabs sit in the status bar; the wizard picks the default tab and ☰
 Display can auto-switch them on a timer (never while someone is touching or typing). Each face has
 its own panel order, hidden panels, and which panels go full width.
 
