@@ -10,7 +10,8 @@ export const DEFAULTS = {
   holidayCalendarId: 'en.usa#holiday@group.v.calendar.google.com',
   calendars: [{ type: 'local', name: 'Family', color: '#2bff66' }],
   weather: { provider: 'auto', screens: {}, speed: 1, scanLines: false },
-  house: { tiles: [] },   // home-hub tiles: [{ entity, label, kind? }] — the hub URL/token live server-side, never here
+  house: { tiles: [] },
+  defaultMode: 'both',   // 'family' | 'command' | 'both' — what a new display shows (each display can override in ☰ Display)   // home-hub tiles: [{ entity, label, kind? }] — the hub URL/token live server-side, never here
 };
 export const LS_KEY = 'fp.config';
 

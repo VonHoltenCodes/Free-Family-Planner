@@ -124,6 +124,9 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             if op == 'test': return self._json(200, {'ok': True, 'message': a.test()})
             if op == 'entities': return self._json(200, {'entities': a.entities()})
             if op == 'states': return self._json(200, {'states': a.states([i for i in q.get('ids', '').split(',') if i])})
+            if op == 'camera':
+                ctype, data = a.camera(q.get('entity', '')); self.send_response(200); self.send_header('Content-Type', ctype); self.send_header('Cache-Control', 'no-store'); self.send_header('Content-Length', str(len(data))); self.end_headers(); self.wfile.write(data); return None
+            if op == 'call': a.call(body['entity'], body['action']); return self._json(200, {'ok': True})
             if op == 'todo': return self._json(200, {'items': a.todo_list()})
             if op == 'todo-add': a.todo_add(body['text']); return self._json(200, {'ok': True})
             if op == 'todo-set': a.todo_set(body['uid'], bool(body.get('completed'))); return self._json(200, {'ok': True})
@@ -168,7 +171,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         try:
             n = int(self.headers.get('Content-Length', '0')); cfg = json.loads(self.rfile.read(n) or b'{}')
             if not isinstance(cfg, dict) or 'family' not in cfg or 'location' not in cfg: raise ValueError('invalid config')
-            clean = {k: cfg[k] for k in ('family', 'location', 'firebase', 'googleClientId', 'holidayCalendarId', 'backend', 'calendars', 'weather', 'house') if k in cfg}
+            clean = {k: cfg[k] for k in ('family', 'location', 'firebase', 'googleClientId', 'holidayCalendarId', 'backend', 'calendars', 'weather', 'house', 'defaultMode') if k in cfg}
             target = os.path.join(ROOT, 'config.js')
             if os.path.exists(target): shutil.copy(target, target + '.bak')
             with open(target, 'w') as f:

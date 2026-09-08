@@ -109,6 +109,17 @@ cd web && python3 -m http.server 8765 --bind 127.0.0.1   # open http://127.0.0.1
 ```
 Firestore, NWS and WeatherStar work locally; Google sign-in only works on an authorized origin.
 
+## Two faces: Family Planner and Home Central Command
+The same display can be a **family planner** (calendar, lists, meals, chores, weather), a **home
+central command** (a big House panel of tappable controls from your hub, weather, calendar), or
+**both** with a FAMILY / COMMAND tab switch in the header and optional auto-rotation. Pick the
+starting point in the wizard; every screen can override it in ☰ Display, where each face has its
+own panel order, hidden panels, and which panels go full width.
+
+House tiles on the Command screen can be **tap to control**: lights, switches and fans toggle,
+covers open and close, locks ask for confirmation. Camera tiles show a live still refreshed every
+15 s; media players show what is playing.
+
 ## Display settings
 The **☰ Display** button (status bar) opens per-screen settings saved in that browser: show/hide
 and reorder panels, chores per kid, week start, 12/24-hour clock, °F/°C, force portrait or
@@ -116,8 +127,8 @@ landscape, and a night-dim schedule (any touch wakes the screen for a minute). D
 the house can be arranged differently.
 
 ## Themes
-Four looks, chosen per screen in ☰ Display: **Hi-Fi** (default), **LCARS**, **Paper** (light) and
-**High contrast**. A theme is one block of CSS token overrides — see `docs/roadmap/themes.md` to
+Five looks, chosen per screen in ☰ Display: **Hi-Fi** (default), **LCARS**, **Paper** (light),
+**E-ink** (simulated e-paper, no colour, no glow) and **High contrast**. A theme is one block of CSS token overrides — see `docs/roadmap/themes.md` to
 add your own.
 
 | Hi-Fi | LCARS | Paper | High contrast |

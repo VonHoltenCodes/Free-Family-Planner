@@ -5,7 +5,7 @@ import { deepMerge, DEFAULTS, LS_KEY } from './config-loader.js';
 import { testFirebase, testSync } from './store.js';
 import { lookupPoint, WS_SCREENS } from './wx.js';
 import { openMeteoConditions } from './wx-card.js';
-import { hub, tileKind } from './hub.js';
+import { hub, tileKind, controllable } from './hub.js';
 import { loadScript } from './gcal.js';
 
 const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
@@ -55,6 +55,8 @@ export function openSetup(current, { firstRun = false } = {}) {
     const f = draft.family;
     if (step === 0) {
       body.appendChild(el('p', 'lead', firstRun ? 'Welcome! A few questions and the wall display is yours. Nothing here leaves your own setup. Not a family planner person? Skip kids and meals, hide any panel later in ☰ Display, and use it as a home dashboard.' : 'Names shown in the header and the status bar.'));
+      body.appendChild(opt2('Start as', [['family', 'Family planner'], ['command', 'Home central command'], ['both', 'Both (tabs)']], draft.defaultMode || 'both', (v) => { draft.defaultMode = v; }));
+      body.appendChild(el('small', 'hint', 'Family planner = calendar, lists, meals, chores, weather. Home central command = house controls from your hub, weather, calendar. Both = a FAMILY / COMMAND tab switch in the header. Every display can override this in ☰ Display.'));
       body.appendChild(field('Family title', text(f.title, 'OUR FAMILY', (v) => { f.title = v; })));
       body.appendChild(field('Subtitle', text(f.subtitle, 'CENTRAL COMMAND', (v) => { f.subtitle = v; })));
       body.appendChild(field('Status bar text', text((f.footer || []).join(' • '), 'FAMILY COMMAND CENTER • EST. 2025 • YOUR TOWN, ST', (v) => { f.footer = v.split('•').map((s) => s.trim()).filter(Boolean); }), 'separate items with •'));
@@ -168,12 +170,12 @@ export function openSetup(current, { firstRun = false } = {}) {
       // tiles
       hubBox.appendChild(el('div', 'sect', 'House panel tiles'));
       const tileList = el('div', 'kid-list'); hubBox.appendChild(tileList);
-      const drawTiles = () => { tileList.innerHTML = ''; hs.tiles.forEach((t, i) => { const row = el('div', 'kid-row'); row.append(text(t.label, 'Label', (v) => { t.label = v; }), el('span', 'eid', t.entity)); const rm = el('button', 'btn sm danger', '×'); rm.type = 'button'; rm.addEventListener('click', () => { hs.tiles.splice(i, 1); drawTiles(); }); row.appendChild(rm); tileList.appendChild(row); }); if (!hs.tiles.length) tileList.appendChild(el('div', 'hint', 'no tiles yet — save & test the hub, then pick entities below')); };
+      const drawTiles = () => { tileList.innerHTML = ''; hs.tiles.forEach((t, i) => { const row = el('div', 'kid-row'); row.append(text(t.label, 'Label', (v) => { t.label = v; }), el('span', 'eid', t.entity)); if (controllable(t.kind || tileKind({ id: t.entity }))) { const ctl = el('button', 'btn sm' + (t.control ? ' on' : ''), 'Tap to control'); ctl.type = 'button'; ctl.addEventListener('click', () => { t.control = !t.control; ctl.classList.toggle('on', !!t.control); }); row.appendChild(ctl); } const rm = el('button', 'btn sm danger', '×'); rm.type = 'button'; rm.addEventListener('click', () => { hs.tiles.splice(i, 1); drawTiles(); }); row.appendChild(rm); tileList.appendChild(row); }); if (!hs.tiles.length) tileList.appendChild(el('div', 'hint', 'no tiles yet — save & test the hub, then pick entities below')); };
       drawTiles();
       const search = text('', 'filter entities…', () => drawEnts()); const entList = el('div', 'ent-list'); hubBox.append(field('Add a tile', search), entList);
       const drawEnts = () => { entList.innerHTML = ''; if (!entities) { entList.appendChild(el('div', 'hint', 'save & test the hub to list entities')); return; } const q = norm2(search.value);
         entities.filter((e) => !q || norm2(e.name).includes(q) || norm2(e.id).includes(q)).slice(0, 60).forEach((e) => { const row = el('div', 'ent-row'); row.append(el('span', null, e.name), el('span', 'hint', `${tileKind(e)}${e.state != null ? ` · ${e.state}${e.unit ? ' ' + e.unit : ''}` : ''}`), el('span', 'eid', e.id));
-          row.addEventListener('click', () => { if (!hs.tiles.some((t) => t.entity === e.id)) { hs.tiles.push({ entity: e.id, label: e.name, kind: tileKind(e) }); drawTiles(); } }); entList.appendChild(row); }); };
+          row.addEventListener('click', () => { if (!hs.tiles.some((t) => t.entity === e.id)) { const k = tileKind(e); hs.tiles.push({ entity: e.id, label: e.name, kind: k, control: k === 'onoff' || k === 'cover' }); drawTiles(); } }); entList.appendChild(row); }); };
       const norm2 = (s) => (s || '').toLowerCase();
       hubBox.appendChild(el('small', 'hint', 'Shopping-list sync is turned on per screen in ☰ Display → "Hub shopping sync" (one screen only, normally the wall display).'));
       const paintHub = () => { hubBox.hidden = hubCfg.type === 'none'; todoI.parentElement.hidden = hubCfg.type !== 'homeassistant'; };

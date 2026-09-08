@@ -15,7 +15,7 @@ $dir = __DIR__ . '/../includes/data'; $file = "$dir/hub.json";
 $hub = is_file($file) ? (json_decode(file_get_contents($file), true) ?: []) : [];
 $op = $_GET['op'] ?? ''; $body = $_SERVER['REQUEST_METHOD'] === 'POST' ? (json_decode(file_get_contents('php://input'), true) ?: []) : [];
 $out = function ($code, $o) { http_response_code($code); echo json_encode($o, JSON_UNESCAPED_SLASHES); exit; };
-$DOMAINS = ['climate', 'sensor', 'binary_sensor', 'person', 'lock', 'switch', 'light', 'cover', 'weather', 'device_tracker', 'input_boolean'];
+$DOMAINS = ['camera', 'media_player', 'fan', 'climate', 'sensor', 'binary_sensor', 'person', 'lock', 'switch', 'light', 'cover', 'weather', 'device_tracker', 'input_boolean'];
 
 function hub_req($method, $url, $token, $body = null) {
     $opts = ['http' => ['method' => $method, 'timeout' => 10, 'ignore_errors' => true, 'header' => "Content-Type: application/json\r\n" . ($token ? "Authorization: Bearer $token\r\n" : '')]];
@@ -46,6 +46,7 @@ try {
         if ($op === 'test') $out(200, ['ok' => true, 'message' => 'Home-IO reachable — ' . count($ents) . ' devices']);
         if ($op === 'entities') $out(200, ['entities' => $ents]);
         if ($op === 'states') { $ids = array_filter(explode(',', $_GET['ids'] ?? '')); $st = []; foreach ($ents as $e) if (in_array($e['id'], $ids, true)) $st[$e['id']] = ['state' => $e['state'], 'unit' => $e['unit'], 'name' => $e['name'], 'deviceClass' => $e['deviceClass'], 'attrs' => $e['attrs'], 'updated' => null]; $out(200, ['states' => (object)$st]); }
+        if ($op === 'call') { $dev = explode('.', $body['entity'] ?? '', 2)[1] ?? ''; $cmd = ['toggle' => 'toggle', 'turn_on' => 'on', 'turn_off' => 'off', 'lock' => 'lock', 'unlock' => 'unlock', 'open' => 'open', 'close' => 'close'][$body['action'] ?? ''] ?? null; if (!$cmd) $out(400, ['error' => 'unknown action']); hub_req('POST', "$url/api/devices/$dev/command", $tok, ['command' => $cmd]); $out(200, ['ok' => true]); }
         $out(502, ['error' => 'Home-IO has no to-do list']);
     }
     // Home Assistant
@@ -54,11 +55,15 @@ try {
         $states = hub_req('GET', "$url/api/states", $tok); $ids = array_filter(explode(',', $_GET['ids'] ?? '')); $ents = []; $st = [];
         foreach ($states as $s) { $eid = $s['entity_id'] ?? ''; $dom = explode('.', $eid)[0]; $a = $s['attributes'] ?? [];
             if ($op === 'entities') { if (in_array($dom, $DOMAINS, true)) $ents[] = ['id' => $eid, 'name' => $a['friendly_name'] ?? $eid, 'domain' => $dom, 'deviceClass' => $a['device_class'] ?? null, 'unit' => $a['unit_of_measurement'] ?? null, 'state' => $s['state'] ?? null]; }
-            elseif (in_array($eid, $ids, true)) { $keep = []; foreach (['temperature', 'current_temperature', 'hvac_action', 'target_temp_high', 'target_temp_low', 'brightness', 'battery_level'] as $k) if (isset($a[$k])) $keep[$k] = $a[$k];
+            elseif (in_array($eid, $ids, true)) { $keep = []; foreach (['temperature', 'current_temperature', 'hvac_action', 'target_temp_high', 'target_temp_low', 'brightness', 'battery_level', 'media_title', 'media_artist', 'source', 'percentage'] as $k) if (isset($a[$k])) $keep[$k] = $a[$k];
                 $st[$eid] = ['state' => $s['state'] ?? null, 'unit' => $a['unit_of_measurement'] ?? null, 'name' => $a['friendly_name'] ?? null, 'deviceClass' => $a['device_class'] ?? null, 'attrs' => (object)$keep, 'updated' => $s['last_updated'] ?? null]; } }
         if ($op === 'entities') { usort($ents, fn($x, $y) => strcasecmp($x['name'], $y['name'])); $out(200, ['entities' => $ents]); }
         $out(200, ['states' => (object)$st]);
     }
+    if ($op === 'camera') { $ent = preg_replace('/[^a-z0-9_.]/', '', $_GET['entity'] ?? ''); $ctx = stream_context_create(['http' => ['timeout' => 15, 'ignore_errors' => true, 'header' => "Authorization: Bearer $tok\r\n"]]); $img = @file_get_contents("$url/api/camera_proxy/$ent", false, $ctx); if ($img === false || $img === '') $out(502, ['error' => 'camera unavailable']); $ct = 'image/jpeg'; foreach ($http_response_header ?? [] as $h) if (stripos($h, 'Content-Type:') === 0) $ct = trim(substr($h, 13)); header("Content-Type: $ct"); echo $img; exit; }
+    if ($op === 'call') { $ent = $body['entity'] ?? ''; $dom = explode('.', $ent)[0]; $act = $body['action'] ?? '';
+        $svc = ['toggle' => [in_array($dom, ['light', 'switch', 'input_boolean', 'fan'], true) ? $dom : 'homeassistant', 'toggle'], 'turn_on' => [$dom, 'turn_on'], 'turn_off' => [$dom, 'turn_off'], 'lock' => ['lock', 'lock'], 'unlock' => ['lock', 'unlock'], 'open' => ['cover', 'open_cover'], 'close' => ['cover', 'close_cover']][$act] ?? null;
+        if (!$svc) $out(400, ['error' => 'unknown action']); hub_req('POST', "$url/api/services/{$svc[0]}/{$svc[1]}", $tok, ['entity_id' => $ent]); $out(200, ['ok' => true]); }
     if ($op === 'todo') { $r = hub_req('POST', "$url/api/services/todo/get_items?return_response", $tok, ['entity_id' => $todo]); $items = $r['service_response'][$todo]['items'] ?? [];
         $out(200, ['items' => array_map(fn($i) => ['uid' => $i['uid'] ?? null, 'text' => $i['summary'] ?? '', 'completed' => ($i['status'] ?? '') === 'completed'], $items)]); }
     if ($op === 'todo-add') { hub_req('POST', "$url/api/services/todo/add_item", $tok, ['entity_id' => $todo, 'item' => $body['text']]); $out(200, ['ok' => true]); }

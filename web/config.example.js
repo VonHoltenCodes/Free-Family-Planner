@@ -1,6 +1,9 @@
 // Free Family Planner — site configuration.
 // Copy to config.js and fill in your own values. config.js is gitignored.
 export default {
+  // What new displays show: 'family' (planner), 'command' (home central command: house controls,
+  // weather, calendar), or 'both' (tabs). Each display can override this in ☰ Display.
+  defaultMode: 'both',
   family: {
     title: 'OUR FAMILY',            // header, line 1
     subtitle: 'CENTRAL COMMAND',    // header, line 2
@@ -45,5 +48,6 @@ export default {
   house: { tiles: [
     // { entity: 'climate.hallway', label: 'Hallway' },
     // { entity: 'binary_sensor.front_door', label: 'Front door' },
+    // { entity: 'light.kitchen', label: 'Kitchen lights', control: true },   // control: tap to toggle / lock / open
   ] },
 };
