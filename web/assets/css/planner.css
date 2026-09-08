@@ -41,7 +41,7 @@ input,select,textarea{font-family:var(--font-body);font-size:16px;color:var(--te
 .scaler{position:fixed;left:0;top:0;width:100vw;height:100vh;background:#000;overflow:hidden;}
 .debug{position:fixed;left:0;bottom:0;z-index:999;background:#000;color:#0f0;font:12px monospace;padding:4px 6px;max-width:100vw;white-space:normal;}
 .canvas{width:1920px;height:1080px;position:absolute;left:0;top:0;overflow:hidden;transform-origin:0 0;
-  display:grid;grid-template-rows:60px 1fr 26px;gap:8px;padding:10px 12px;
+  display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:60px 1fr 26px;gap:8px;padding:10px 12px;
   background:var(--chassis);
   background-image:
     radial-gradient(120% 90% at 50% 0%,var(--canvas-glow) 0%,transparent 60%),
@@ -49,7 +49,7 @@ input,select,textarea{font-family:var(--font-body);font-size:16px;color:var(--te
   box-shadow:inset 0 0 0 2px #000,inset 0 0 60px rgba(0,0,0,.7);}
 
 /* ---------- header: EasyAmp title bar + LCD readouts ---------- */
-.rack{position:relative;display:flex;align-items:center;gap:14px;padding:0 14px 0 0;
+.rack{position:relative;display:flex;align-items:center;gap:14px;padding:0 14px 0 0;min-width:0;overflow:hidden;
   background:var(--bar-blue);
   background-image:linear-gradient(180deg,rgba(255,255,255,.08),rgba(0,0,0,.18)),
     repeating-linear-gradient(90deg,rgba(255,255,255,.035) 0 2px,transparent 2px 6px);
@@ -74,7 +74,7 @@ input,select,textarea{font-family:var(--font-body);font-size:16px;color:var(--te
 .lcd.temp{font-size:26px;}
 .lcd.temp .unit{font-family:var(--font-pixel);font-size:13px;vertical-align:top;}
 .lcd .ghost{position:absolute;left:0;top:0;color:rgba(30,255,30,.10);text-shadow:none;pointer-events:none;}
-.rack .date{font-family:var(--font-pixel);font-size:17px;letter-spacing:2px;color:var(--bar-text);text-shadow:1px 1px 0 #000;white-space:nowrap;}
+.rack .date{font-family:var(--font-pixel);font-size:17px;letter-spacing:2px;color:var(--bar-text);text-shadow:1px 1px 0 #000;white-space:nowrap;min-width:0;flex:0 1 auto;overflow:hidden;text-overflow:ellipsis;}
 .rack .wxword{font-family:var(--font-pixel);font-size:11px;letter-spacing:1px;color:var(--lcd);opacity:.85;max-width:120px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 
 /* EasyAmp beveled silver buttons */
@@ -94,14 +94,14 @@ input,select,textarea{font-family:var(--font-body);font-size:16px;color:var(--te
 .btn.on .led{background:#2bff2b;box-shadow:0 0 5px rgba(43,255,43,.95);}
 
 /* ---------- main grid ---------- */
-.main{display:grid;grid-template-columns:1176px 1fr;grid-template-rows:1fr 206px;gap:8px;min-height:0;}
+.main{display:grid;grid-template-columns:1176px 1fr;grid-template-rows:1fr 206px;gap:8px;min-height:0;min-width:0;}
 .col{display:grid;gap:8px;min-height:0;}
 .col.left{grid-template-rows:1fr 206px;}
 .col.right{grid-template-rows:528px 1fr;}
 .row.bottom{grid-column:1/3;display:grid;grid-template-columns:1fr 560px 460px;gap:8px;min-height:0;}
 
 /* ---------- SlowBooks-style panel window ---------- */
-.panel{display:flex;flex-direction:column;min-height:0;min-width:0;background:var(--panel);
+.panel{display:flex;flex-direction:column;min-height:0;min-width:0;max-width:100%;background:var(--panel);
   border-top:1px solid var(--bevel-hi);border-left:1px solid var(--bevel-hi);border-right:1px solid var(--bevel-lo);border-bottom:1px solid var(--bevel-lo);
   border-radius:4px;box-shadow:0 2px 6px rgba(0,0,0,.55);overflow:hidden;}
 .panel > .tbar{flex:none;display:flex;align-items:center;gap:8px;height:28px;padding:0 8px 0 10px;
@@ -233,7 +233,7 @@ select option{background:var(--panel);color:var(--text);}
 .chore.done input[type=text]{text-decoration:line-through;color:var(--text-dim);}
 
 /* ---------- status bar (SlowBooks statusbar) ---------- */
-.status{display:flex;align-items:center;gap:14px;padding:0 10px;background:linear-gradient(180deg,var(--status-hi),var(--status-lo));
+.status{display:flex;align-items:center;gap:14px;padding:0 10px;min-width:0;overflow:hidden;background:linear-gradient(180deg,var(--status-hi),var(--status-lo));
   border-top:1px solid var(--bevel-hi);border-bottom:1px solid var(--bevel-lo);border-radius:3px;font-family:var(--font-pixel);font-size:11px;letter-spacing:1.5px;color:var(--text-dim);}
 .status .pills{display:flex;gap:4px;}
 .status .pill{height:10px;border-radius:5px;}
@@ -244,7 +244,7 @@ select option{background:var(--panel);color:var(--text);}
 .status .footer-text{display:flex;gap:10px;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;}
 .status .footer-text span{white-space:nowrap;}
 .status > *{white-space:nowrap;flex:none;}
-.status .footer-text{flex:0 1 auto;}
+.status .footer-text{flex:0 1 auto;min-width:40px;}
 .status .grow{flex:1 1 0;min-width:4px;}
 .status .svc{white-space:nowrap;}
 .status .grow{flex:1;}
