@@ -1,0 +1,141 @@
+#!/usr/bin/env python3
+"""ffp — command-line client for the Free Family Planner API (docs/api.md). Python 3.8+, stdlib only.
+
+  ffp [--url URL] [--token TOKEN] <command> ...
+
+Where to point it (or set FFP_URL / FFP_TOKEN, or ~/.config/ffp/config.json {"url":…,"token":…}):
+  local-host install   ffp --url http://planner.local:8765
+  hosted install       ffp --url https://example.com/family-planner --token <FP_API_TOKEN>
+                       (or `ffp --url … login <user>` once to use the site login instead of a token)
+
+Examples:
+  ffp routes                                   ffp config get                 ffp config get family.title
+  ffp config set family.title "THE SMITHS"     ffp config set power.warnAbove 8
+  ffp hub get | test                           ffp hub set --type homeassistant --url http://ha.local:8123 --token <HA token>
+  ffp hub entities [--domain light]            ffp hub states light.kitchen climate.hallway
+  ffp hub call light.kitchen toggle            ffp hub call lock.front_door lock
+  ffp tiles | tiles add climate.hallway --label Hallway [--control] | tiles rm climate.hallway
+  ffp list shopping | list shopping add "Milk" | list shopping done <id> | list shopping rm <id>
+  ffp meals | meals set Tuesday "Tacos"        ffp chores [kid] | chores set alex "Feed dog" "Homework"
+  ffp events | events add "Dentist" 2026-09-10 [2026-09-11] [--all-day]
+  ffp state | power | hub todo | hub todo add "Bread"
+Every command prints JSON; add -q for a compact one-liner.
+"""
+import argparse, base64, http.cookiejar, json, os, sys, urllib.parse, urllib.request
+
+CFG = os.path.expanduser('~/.config/ffp/config.json'); COOKIES = os.path.expanduser('~/.config/ffp/cookies.txt')
+
+def load_cfg():
+    try: return json.load(open(CFG))
+    except (OSError, ValueError): return {}
+
+class Client:
+    def __init__(self, url, token):
+        self.url = url.rstrip('/'); self.token = token
+        self.jar = http.cookiejar.MozillaCookieJar(COOKIES)
+        try: self.jar.load(ignore_discard=True)
+        except OSError: pass
+        self.opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(self.jar))
+    def req(self, method, path, body=None, params=None):
+        u = f"{self.url}/api/v1/{path.lstrip('/')}" + (('?' + urllib.parse.urlencode(params)) if params else '')
+        data = json.dumps(body).encode() if body is not None else None
+        r = urllib.request.Request(u, data=data, method=method, headers={'Content-Type': 'application/json', 'Accept': 'application/json', **({'Authorization': f'Bearer {self.token}'} if self.token else {})})
+        try:
+            with self.opener.open(r, timeout=30) as resp: raw = resp.read(); code = resp.status
+        except urllib.error.HTTPError as e: raw = e.read(); code = e.code
+        try: out = json.loads(raw or b'{}')
+        except ValueError: out = {'error': f'non-JSON response ({code})', 'body': raw[:200].decode(errors='replace')}
+        if code >= 400: sys.stderr.write(f'HTTP {code}: {out.get("error", out)}\n'); sys.exit(1)
+        return out
+    def login(self, user, password):
+        data = urllib.parse.urlencode({'username': user, 'password': password}).encode()
+        r = urllib.request.Request(f'{self.url}/auth.php', data=data, method='POST'); r.add_header('Content-Type', 'application/x-www-form-urlencoded')
+        opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(self.jar), NoRedirect())
+        try: opener.open(r, timeout=30)
+        except urllib.error.HTTPError as e:
+            if e.code != 302: raise
+        os.makedirs(os.path.dirname(COOKIES), exist_ok=True); self.jar.save(ignore_discard=True); os.chmod(COOKIES, 0o600)
+        return self.req('GET', '')
+
+class NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, *a, **k): return None
+
+def get_path(obj, dotted):
+    for k in dotted.split('.'):
+        obj = obj[int(k)] if isinstance(obj, list) else obj[k]
+    return obj
+def set_path(obj, dotted, value):
+    keys = dotted.split('.'); cur = obj
+    for k in keys[:-1]: cur = cur.setdefault(k, {})
+    cur[keys[-1]] = value; return obj
+def parse_value(v):
+    if v in ('true', 'false'): return v == 'true'
+    try: return json.loads(v)
+    except ValueError: return v
+
+def main():
+    cfg = load_cfg()
+    ap = argparse.ArgumentParser(prog='ffp', description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument('--url', default=os.environ.get('FFP_URL') or cfg.get('url') or 'http://localhost:8765'); ap.add_argument('--token', default=os.environ.get('FFP_TOKEN') or cfg.get('token') or '')
+    ap.add_argument('-q', '--quiet', action='store_true', help='compact JSON'); ap.add_argument('cmd', nargs=argparse.REMAINDER)
+    a = ap.parse_args(); c = Client(a.url, a.token); cmd = a.cmd
+    def show(o): print(json.dumps(o) if a.quiet else json.dumps(o, indent=2, ensure_ascii=False))
+    if not cmd: ap.print_help(); return
+    k = cmd[0]; rest = cmd[1:]
+    if k == 'routes': return show(c.req('GET', ''))
+    if k == 'login':
+        import getpass; user = rest[0] if rest else input('username: '); pw = getpass.getpass('password: '); c.login(user, pw); return show({'ok': True, 'saved': COOKIES})
+    if k == 'save-config':
+        os.makedirs(os.path.dirname(CFG), exist_ok=True); json.dump({'url': a.url, 'token': a.token}, open(CFG, 'w')); os.chmod(CFG, 0o600); return show({'saved': CFG})
+    if k == 'config':
+        sub = rest[0] if rest else 'get'
+        if sub == 'get': cfgj = c.req('GET', 'config'); return show(get_path(cfgj, rest[1]) if len(rest) > 1 else cfgj)
+        if sub == 'set': patch = set_path({}, rest[1], parse_value(rest[2])); return show(c.req('PATCH', 'config', patch))
+        if sub == 'replace': return show(c.req('PUT', 'config', json.load(open(rest[1]) if len(rest) > 1 and rest[1] != '-' else sys.stdin)))
+    if k == 'tiles':
+        if not rest: return show(c.req('GET', 'tiles'))
+        if rest[0] == 'add':
+            p = argparse.ArgumentParser(prog='ffp tiles add'); p.add_argument('entity'); p.add_argument('--label'); p.add_argument('--kind'); p.add_argument('--control', action='store_true'); t = p.parse_args(rest[1:])
+            return show(c.req('POST', 'tiles', {kk: v for kk, v in vars(t).items() if v not in (None, False)}))
+        if rest[0] == 'rm': return show(c.req('DELETE', f'tiles/{rest[1]}'))
+    if k == 'hub':
+        sub = rest[0] if rest else 'get'
+        if sub == 'get': return show(c.req('GET', 'hub'))
+        if sub == 'set':
+            p = argparse.ArgumentParser(prog='ffp hub set'); p.add_argument('--type'); p.add_argument('--url', dest='hurl'); p.add_argument('--token', dest='htoken'); p.add_argument('--todo'); t = p.parse_args(rest[1:])
+            body = {kk: v for kk, v in {'type': t.type, 'url': t.hurl, 'token': t.htoken, 'todoEntity': t.todo}.items() if v is not None}; return show(c.req('PATCH', 'hub', body))
+        if sub == 'test': return show(c.req('GET', 'hub/test'))
+        if sub == 'entities': p = argparse.ArgumentParser(prog='ffp hub entities'); p.add_argument('--domain'); t = p.parse_args(rest[1:]); return show(c.req('GET', 'hub/entities', params={'domain': t.domain} if t.domain else None))
+        if sub == 'states': return show(c.req('GET', 'hub/states', params={'ids': ','.join(rest[1:])}))
+        if sub == 'call': return show(c.req('POST', 'hub/call', {'entity': rest[1], 'action': rest[2]}))
+        if sub == 'calendars': return show(c.req('GET', 'hub/calendars'))
+        if sub == 'todo':
+            if len(rest) == 1: return show(c.req('GET', 'hub/todo'))
+            if rest[1] == 'add': return show(c.req('POST', 'hub/todo', {'text': rest[2]}))
+            if rest[1] == 'done': return show(c.req('PATCH', 'hub/todo', {'uid': rest[2], 'completed': True}))
+            if rest[1] == 'rm': return show(c.req('DELETE', 'hub/todo', {'uid': rest[2]}))
+    if k == 'list':
+        col = rest[0]; sub = rest[1] if len(rest) > 1 else 'get'
+        if sub == 'get': return show(c.req('GET', f'lists/{col}'))
+        if sub == 'add': return show(c.req('POST', f'lists/{col}', {'text': rest[2]}))
+        if sub == 'done': return show(c.req('PATCH', f'lists/{col}/{rest[2]}', {'completed': True}))
+        if sub == 'undo': return show(c.req('PATCH', f'lists/{col}/{rest[2]}', {'completed': False}))
+        if sub == 'rm': return show(c.req('DELETE', f'lists/{col}/{rest[2]}'))
+    if k == 'meals':
+        if not rest: return show(c.req('GET', 'meals'))
+        if rest[0] == 'set': return show(c.req('PATCH', 'meals', {rest[1]: rest[2]}))
+    if k == 'chores':
+        if not rest: return show(c.req('GET', 'chores'))
+        if rest[0] == 'set': return show(c.req('PUT', f'chores/{rest[1]}', [{'id': i, 'text': t, 'completed': False} for i, t in enumerate(rest[2:])]))
+        return show(c.req('GET', f'chores/{rest[0]}'))
+    if k == 'events':
+        if not rest: return show(c.req('GET', 'events'))
+        if rest[0] == 'add':
+            p = argparse.ArgumentParser(prog='ffp events add'); p.add_argument('summary'); p.add_argument('start'); p.add_argument('end', nargs='?'); p.add_argument('--all-day', action='store_true'); p.add_argument('--location', default=''); t = p.parse_args(rest[1:])
+            return show(c.req('POST', 'events', {'summary': t.summary, 'start': t.start, 'end': t.end or t.start, 'allDay': t.all_day or len(t.start) == 10, 'location': t.location}))
+        if rest[0] == 'rm': return show(c.req('DELETE', f'events/{rest[1]}'))
+    if k == 'state': return show(c.req('GET', 'state'))
+    if k == 'power': return show(c.req('GET', 'power'))
+    sys.stderr.write(f'unknown command: {" ".join(cmd)}\n'); ap.print_help(); sys.exit(2)
+
+if __name__ == '__main__': main()

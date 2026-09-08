@@ -5,7 +5,7 @@
  * The web server user must be able to write this folder (config.js + config.js.bak).
  */
 
-define('FP_AUTH', true);
+if (!defined('FP_AUTH')) define('FP_AUTH', true);
 require_once __DIR__ . '/includes/auth_config.php';
 
 ini_set('session.cookie_httponly', 1);

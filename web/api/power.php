@@ -4,12 +4,12 @@
  * Mirrors tools/serve.py: current-hour average + 5-min price (documented API) and today's/tomorrow's
  * day-ahead hourly prices (the ServletFeed the ComEd site uses). ¢/kWh, Central time. Cached 5 min.
  */
-define('FP_AUTH', true);
+if (!defined('FP_AUTH')) define('FP_AUTH', true);
 require_once __DIR__ . '/../includes/auth_config.php';
 ini_set('session.cookie_httponly', 1); ini_set('session.use_only_cookies', 1); ini_set('session.cookie_samesite', 'Strict');
-session_name(FP_SESSION_NAME); session_set_cookie_params(FP_SESSION_LIFETIME); session_start();
+if (!defined('FP_API_INTERNAL')) { session_name(FP_SESSION_NAME); session_set_cookie_params(FP_SESSION_LIFETIME); session_start(); }
 header('Content-Type: application/json'); header('Cache-Control: no-store');
-if (!isset($_SESSION['fp_authenticated']) || $_SESSION['fp_authenticated'] !== true) { http_response_code(401); echo '{"error":"not signed in"}'; exit; }
+if (!defined('FP_API_INTERNAL') && (!isset($_SESSION['fp_authenticated']) || $_SESSION['fp_authenticated'] !== true)) { http_response_code(401); echo '{"error":"not signed in"}'; exit; }
 $dir = __DIR__ . '/../includes/data'; $cache = "$dir/power.json";
 if (is_file($cache) && time() - filemtime($cache) < 300) { readfile($cache); exit; }
 $tz = new DateTimeZone('America/Chicago'); $now = new DateTime('now', $tz);

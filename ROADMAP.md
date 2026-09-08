@@ -11,6 +11,7 @@ still gets a `feat/<name>` branch and a PR.
 | **Home hub interop** ✅ | `feat/home-hub` | Generic hub adapter, Home Assistant first, Home-IO second: the planner exposed as sensors (`/api/state`), two-way shopping-list sync with the hub's to-do list, and a read-only House panel (thermostat, doors, who's home). Hub token stays server-side. Issue #19. ✅ **Shipped:** `/api/state` + HA sensor docs, House panel with configurable tiles, two-way shopping-list sync, Home Assistant + Home-IO adapters, `tools/fake-ha.py` for testing. |
 | **Two faces: Family / Command screens** ✅ | `feat/screens` | Family planner, Home central command, or both with tabs + auto-rotate; per-screen panel order/hidden/wide; tap-to-control tiles (lights, switches, fans, covers, locks with confirm); camera and media tiles; E-ink theme, refined LCARS and High-contrast. |
 | **Electricity prices** ✅ | `main` | ComEd Hourly Pricing panel: live ¢/kWh, day-ahead hours today + tomorrow, SPIKE warnings (strip, banner, header pill), published to `/api/state`. Other utilities' hourly feeds can slot in behind the same panel. |
+| **API + CLI** ✅ | `feat/api-v1` | `/api/v1` on both servers (config, tiles, hub, lists, meals, chores, events, state, power) with LAN-open or bearer-token auth, and `tools/ffp`, a stdlib CLI that drives all of it. |
 
 ## Shipped in v0.1.0
 

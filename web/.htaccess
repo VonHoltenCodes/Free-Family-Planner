@@ -8,6 +8,9 @@
     RewriteRule ^includes/ - [F,L]
     RewriteRule ^app\.html$ - [F,L]
 
+    # The documented API: /api/v1/<route> → api/v1.php (docs/api.md)
+    RewriteRule ^api/v1/?(.*)$ api/v1.php?path=$1 [L,QSA]
+
     # Static assets and the bundled WeatherStar 4000+ build are served directly
     RewriteRule ^(assets|ws4kp)/ - [L]
 
@@ -29,6 +32,11 @@
 <FilesMatch "\.(js|css)$">
     Header set Cache-Control "no-cache"
 </FilesMatch>
+
+<IfModule mod_setenvif.c>
+    # pass Authorization through to PHP for API tokens
+    SetEnvIf Authorization "(.*)" HTTP_AUTHORIZATION=$1
+</IfModule>
 
 <IfModule mod_headers.c>
     # The site root sets X-Frame-Options DENY with "Header always"; that blocks the WeatherStar

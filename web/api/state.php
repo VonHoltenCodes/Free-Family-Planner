@@ -6,12 +6,12 @@
  *                        (define FP_STATE_TOKEN in includes/auth_config.php to let Home Assistant poll)
  * Without a snapshot yet, derives what it can from the self-hosted sync store.
  */
-define('FP_AUTH', true);
+if (!defined('FP_AUTH')) define('FP_AUTH', true);
 require_once __DIR__ . '/../includes/auth_config.php';
 ini_set('session.cookie_httponly', 1); ini_set('session.use_only_cookies', 1); ini_set('session.cookie_samesite', 'Strict');
-session_name(FP_SESSION_NAME); session_set_cookie_params(FP_SESSION_LIFETIME); session_start();
+if (!defined('FP_API_INTERNAL')) { session_name(FP_SESSION_NAME); session_set_cookie_params(FP_SESSION_LIFETIME); session_start(); }
 header('Content-Type: application/json'); header('Cache-Control: no-store');
-$signedIn = isset($_SESSION['fp_authenticated']) && $_SESSION['fp_authenticated'] === true;
+$signedIn = defined('FP_API_INTERNAL') || (isset($_SESSION['fp_authenticated']) && $_SESSION['fp_authenticated'] === true);
 $tokenOk = defined('FP_STATE_TOKEN') && FP_STATE_TOKEN !== '' && isset($_GET['token']) && hash_equals(FP_STATE_TOKEN, (string)$_GET['token']);
 $dir = __DIR__ . '/../includes/data'; $file = "$dir/state.json";
 if ($_SERVER['REQUEST_METHOD'] === 'PUT') {

@@ -58,7 +58,12 @@ class HomeAssistant:
             threading.Thread(target=poke, daemon=True).start(); return True
         if not svc: raise HubError(f'unknown action {action}')
         _req('POST', f'{self.url}/api/services/{svc[0]}/{svc[1]}', self.token, {'entity_id': entity}); return True
-    def calendars(self): return [{'id': c['entity_id'], 'name': c.get('name', c['entity_id'])} for c in _req('GET', f'{self.url}/api/calendars', self.token)]
+    def calendars(self):
+        try: cs = _req('GET', f'{self.url}/api/calendars', self.token)
+        except HubError as e:
+            if '404' in str(e): return []   # HA without any calendar entities answers 404
+            raise
+        return [{'id': c['entity_id'], 'name': c.get('name', c['entity_id'])} for c in cs]
     def cal_events(self, entity, start, end):
         from urllib.parse import quote
         return _req('GET', f'{self.url}/api/calendars/{entity}?start={quote(start)}&end={quote(end)}', self.token)

@@ -15,6 +15,10 @@ define('FP_PASSWORD_HASH', '$2y$10$REPLACE_WITH_OUTPUT_OF_password_hash');
 define('FP_SESSION_NAME', 'fp_session');
 define('FP_SESSION_LIFETIME', 7 * 24 * 60 * 60);   // seconds; 7 days keeps the wall display signed in
 
+// Optional: API token for CLIs / agents / automations — "Authorization: Bearer <this>" on /api/v1/*
+//   generate one: php -r 'echo bin2hex(random_bytes(24)), PHP_EOL;'
+define('FP_API_TOKEN', '');
+
 // Optional: lets a home hub (Home Assistant REST sensor) read api/state.php without a login:
 //   http://…/family-planner/api/state.php?token=<this value>   (leave empty to disable)
 define('FP_STATE_TOKEN', '');
