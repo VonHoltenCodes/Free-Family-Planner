@@ -46,6 +46,8 @@ try {
         if ($op === 'test') $out(200, ['ok' => true, 'message' => 'Home-IO reachable — ' . count($ents) . ' devices']);
         if ($op === 'entities') $out(200, ['entities' => $ents]);
         if ($op === 'states') { $ids = array_filter(explode(',', $_GET['ids'] ?? '')); $st = []; foreach ($ents as $e) if (in_array($e['id'], $ids, true)) $st[$e['id']] = ['state' => $e['state'], 'unit' => $e['unit'], 'name' => $e['name'], 'deviceClass' => $e['deviceClass'], 'attrs' => $e['attrs'], 'updated' => null]; $out(200, ['states' => (object)$st]); }
+        if ($op === 'calendars') $out(200, ['calendars' => []]);
+        if ($op === 'calevents') $out(200, ['events' => []]);
         if ($op === 'call') { $dev = explode('.', $body['entity'] ?? '', 2)[1] ?? ''; $cmd = ['toggle' => 'toggle', 'turn_on' => 'on', 'turn_off' => 'off', 'lock' => 'lock', 'unlock' => 'unlock', 'open' => 'open', 'close' => 'close'][$body['action'] ?? ''] ?? null; if (!$cmd) $out(400, ['error' => 'unknown action']); hub_req('POST', "$url/api/devices/$dev/command", $tok, ['command' => $cmd]); $out(200, ['ok' => true]); }
         $out(502, ['error' => 'Home-IO has no to-do list']);
     }
@@ -60,6 +62,8 @@ try {
         if ($op === 'entities') { usort($ents, fn($x, $y) => strcasecmp($x['name'], $y['name'])); $out(200, ['entities' => $ents]); }
         $out(200, ['states' => (object)$st]);
     }
+    if ($op === 'calendars') { $cs = hub_req('GET', "$url/api/calendars", $tok); $out(200, ['calendars' => array_map(fn($c) => ['id' => $c['entity_id'], 'name' => $c['name'] ?? $c['entity_id']], is_array($cs) ? $cs : [])]); }
+    if ($op === 'calevents') { $ent = preg_replace('/[^a-z0-9_.]/', '', $_GET['entity'] ?? ''); $ev = hub_req('GET', "$url/api/calendars/$ent?start=" . rawurlencode($_GET['start'] ?? '') . '&end=' . rawurlencode($_GET['end'] ?? ''), $tok); $out(200, ['events' => is_array($ev) ? $ev : []]); }
     if ($op === 'camera') { $ent = preg_replace('/[^a-z0-9_.]/', '', $_GET['entity'] ?? ''); $ctx = stream_context_create(['http' => ['timeout' => 15, 'ignore_errors' => true, 'header' => "Authorization: Bearer $tok\r\n"]]); $img = @file_get_contents("$url/api/camera_proxy/$ent", false, $ctx); if ($img === false || $img === '') $out(502, ['error' => 'camera unavailable']); $ct = 'image/jpeg'; foreach ($http_response_header ?? [] as $h) if (stripos($h, 'Content-Type:') === 0) $ct = trim(substr($h, 13)); header("Content-Type: $ct"); echo $img; exit; }
     if ($op === 'call') { $ent = $body['entity'] ?? ''; $dom = explode('.', $ent)[0]; $act = $body['action'] ?? '';
         $svc = ['toggle' => [in_array($dom, ['light', 'switch', 'input_boolean', 'fan'], true) ? $dom : 'homeassistant', 'toggle'], 'turn_on' => [$dom, 'turn_on'], 'turn_off' => [$dom, 'turn_off'], 'lock' => ['lock', 'lock'], 'unlock' => ['lock', 'unlock'], 'open' => ['cover', 'open_cover'], 'close' => ['cover', 'close_cover']][$act] ?? null;

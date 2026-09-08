@@ -48,6 +48,10 @@ class HomeAssistant:
                'lock': ('lock', 'lock'), 'unlock': ('lock', 'unlock'), 'open': ('cover', 'open_cover'), 'close': ('cover', 'close_cover')}.get(action)
         if not svc: raise HubError(f'unknown action {action}')
         _req('POST', f'{self.url}/api/services/{svc[0]}/{svc[1]}', self.token, {'entity_id': entity}); return True
+    def calendars(self): return [{'id': c['entity_id'], 'name': c.get('name', c['entity_id'])} for c in _req('GET', f'{self.url}/api/calendars', self.token)]
+    def cal_events(self, entity, start, end):
+        from urllib.parse import quote
+        return _req('GET', f'{self.url}/api/calendars/{entity}?start={quote(start)}&end={quote(end)}', self.token)
     def camera(self, entity):
         req = urllib.request.Request(f'{self.url}/api/camera_proxy/{entity}', headers={'Authorization': f'Bearer {self.token}'})
         try:
@@ -75,6 +79,8 @@ class HomeIO:
         dev = entity.split('.', 1)[1]; cmd = {'toggle': 'toggle', 'turn_on': 'on', 'turn_off': 'off', 'lock': 'lock', 'unlock': 'unlock', 'open': 'open', 'close': 'close'}.get(action)
         if not cmd: raise HubError(f'unknown action {action}')
         _req('POST', f'{self.url}/api/devices/{dev}/command', self.token, {'command': cmd}); return True
+    def calendars(self): return []
+    def cal_events(self, entity, start, end): return []
     def camera(self, entity): raise HubError('Home-IO has no cameras')
     def todo_list(self): raise HubError('Home-IO has no to-do list')
     todo_add = todo_set = todo_remove = todo_list

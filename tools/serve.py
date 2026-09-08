@@ -124,6 +124,8 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             if op == 'test': return self._json(200, {'ok': True, 'message': a.test()})
             if op == 'entities': return self._json(200, {'entities': a.entities()})
             if op == 'states': return self._json(200, {'states': a.states([i for i in q.get('ids', '').split(',') if i])})
+            if op == 'calendars': return self._json(200, {'calendars': a.calendars()})
+            if op == 'calevents': return self._json(200, {'events': a.cal_events(q.get('entity', ''), q.get('start', ''), q.get('end', ''))})
             if op == 'camera':
                 ctype, data = a.camera(q.get('entity', '')); self.send_response(200); self.send_header('Content-Type', ctype); self.send_header('Cache-Control', 'no-store'); self.send_header('Content-Length', str(len(data))); self.end_headers(); self.wfile.write(data); return None
             if op == 'call': a.call(body['entity'], body['action']); return self._json(200, {'ok': True})

@@ -16,6 +16,8 @@ export const hub = {
   status: () => api('get'), save: (cfg) => api('save', {}, cfg), test: () => api('test'), entities: () => api('entities').then((r) => r.entities),
   states: (ids) => api('states', { ids: ids.join(',') }).then((r) => r.states),
   call: (entity, action) => api('call', {}, { entity, action }),
+  calendars: () => api('calendars').then((r) => r.calendars),
+  calEvents: (entity, start, end) => api('calevents', { entity, start, end }).then((r) => r.events),
   todo: () => api('todo').then((r) => r.items), todoAdd: (text) => api('todo-add', {}, { text }), todoSet: (uid, completed) => api('todo-set', {}, { uid, completed }), todoRemove: (uid) => api('todo-remove', {}, { uid }),
 };
 

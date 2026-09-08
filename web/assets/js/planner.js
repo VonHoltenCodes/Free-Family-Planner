@@ -332,7 +332,7 @@ async function loadEvents(showBusy = true) {
     expandAll(); renderAll();
     const feedErr = Object.values(cal.status || {}).some((v) => typeof v === 'string');
     led('led-gc', feedErr ? 'warn' : ((gcal?.signedIn || cal.ics.length || cal.local) ? 'on' : ''));
-    const parts = []; if (gcal?.signedIn) parts.push(gcal.calendars.find((c) => c.id === gcal.calendarId)?.summary || 'Google'); cal.ics.forEach((f) => parts.push(f.name)); if (cal.local) parts.push(cal.local.name);
+    const parts = []; if (gcal?.signedIn) parts.push(gcal.calendars.find((c) => c.id === gcal.calendarId)?.summary || 'Google'); cal.ics.forEach((f) => parts.push(f.name)); cal.ha.forEach((f) => parts.push(f.name)); if (cal.local) parts.push(cal.local.name);
     $('cal-sub').textContent = parts.join(' + ') || 'No calendars';
     setWriteUI();
   } catch (e) {

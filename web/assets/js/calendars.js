@@ -4,6 +4,7 @@
 import { GCal } from './gcal.js';
 import { icsToEvents } from './ics.js';
 import * as store from './store.js';
+import { hub } from './hub.js';
 
 const pad = (n) => String(n).padStart(2, '0');
 const dateKey = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
@@ -15,6 +16,7 @@ export class Calendars {
     this.config = config;
     const list = Array.isArray(config.calendars) && config.calendars.length ? config.calendars : [{ type: 'local', name: 'Family' }];
     this.ics = list.filter((c) => c.type === 'ics' && c.url).map((c, i) => ({ id: `ics${i}`, name: c.name || `Feed ${i + 1}`, url: c.url, color: c.color || '#c98bdb' }));
+    this.ha = list.filter((c) => c.type === 'ha' && c.entity).map((c) => ({ id: `ha:${c.entity}`, entity: c.entity, name: c.name || c.entity, color: c.color || '#7d9bff' }));
     this.local = list.find((c) => c.type === 'local') ? { id: 'local', name: list.find((c) => c.type === 'local').name || 'Family', color: list.find((c) => c.type === 'local').color || '#2bff66' } : null;
     this.google = config.googleClientId ? new GCal({ clientId: config.googleClientId, holidayCalendarId: config.holidayCalendarId }) : null;
     this.localEvents = []; this.icsCache = {}; this.onLocalChange = () => {};
@@ -36,6 +38,14 @@ export class Calendars {
     for (const feed of this.ics) {
       try { const text = await this.fetchIcs(feed); const evs = icsToEvents(text, a, b, feed); out.push(...evs); status[feed.id] = evs.length; }
       catch (e) { console.warn(`ICS ${feed.name}:`, e.message); status[feed.id] = `error: ${e.message}`; }
+    }
+    for (const hc of this.ha) {
+      try {
+        const evs = await hub.calEvents(hc.entity, a.toISOString(), b.toISOString());
+        evs.forEach((e, i) => out.push({ id: `${hc.id}:${e.uid || i}:${e.start?.date || e.start?.dateTime}`, provider: hc.id, readOnly: true, color: hc.color, calendarName: hc.name,
+          summary: e.summary || '', location: e.location || '', description: e.description || '', start: e.start, end: e.end }));
+        status[hc.id] = evs.length;
+      } catch (e) { console.warn(`HA calendar ${hc.name}:`, e.message); status[hc.id] = `error: ${e.message}`; }
     }
     if (this.local) out.push(...this.localEvents.map((e) => this.fromLocal(e)));
     this.status = status;

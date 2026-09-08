@@ -141,6 +141,17 @@ export function openSetup(current, { firstRun = false } = {}) {
       body.appendChild(testBtn('Test feeds', async () => { const f = draft.calendars.filter((c) => c.type === 'ics' && c.url); if (!f.length) throw new Error('no feeds added'); const res = [];
         for (const c of f) { try { const r = await fetch(`api/ics.php?url=${encodeURIComponent(c.url)}`, { cache: 'no-store' }); if (r.status === 403) { res.push(`${c.name || c.url}: save first, then test`); continue; } if (!r.ok) throw new Error(`HTTP ${r.status}`); const t = await r.text(); if (!/BEGIN:VCALENDAR/i.test(t)) throw new Error('not an ICS file'); res.push(`${c.name || c.url}: ok, ${(t.match(/BEGIN:VEVENT/g) || []).length} events`); } catch (e) { res.push(`${c.name || c.url}: ${e.message}`); } }
         return res.join(' · '); }));
+      // home assistant calendars (if a hub is connected)
+      const haSect = el('div'); haSect.hidden = true; body.appendChild(haSect);
+      haSect.appendChild(el('div', 'sect', 'Home Assistant calendars (read-only)'));
+      const haList = el('div', 'kid-list'); haSect.appendChild(haList);
+      hub.status().then((s) => { if (s.type !== 'homeassistant') return; return hub.calendars().then((cals) => { if (!cals.length) return; haSect.hidden = false;
+        cals.forEach((hc, i) => { const row = el('div', 'panel-row'); const cur = () => draft.calendars.find((x) => x.type === 'ha' && x.entity === hc.id);
+          const chk = el('button', 'chk' + (cur() ? ' on' : '')); chk.type = 'button'; chk.setAttribute('role', 'switch');
+          const col = el('input'); col.type = 'color'; col.value = cur()?.color || KID_COLORS[(i + 2) % KID_COLORS.length]; col.addEventListener('input', () => { const c = cur(); if (c) c.color = col.value; });
+          chk.addEventListener('click', () => { const c = cur(); if (c) draft.calendars.splice(draft.calendars.indexOf(c), 1); else draft.calendars.push({ type: 'ha', entity: hc.id, name: hc.name, color: col.value }); chk.classList.toggle('on', !c); });
+          row.append(chk, el('span', 'pname', hc.name), el('span', 'eid', hc.id), col); haList.appendChild(row); });
+        haSect.appendChild(el('small', 'hint', 'Calendars your hub knows (Google, iCloud, CalDAV, local — whatever you connected in Home Assistant). Shown read-only; events are fetched through your server.')); }); }).catch(() => {});
       // google
       body.appendChild(el('div', 'sect', 'Google Calendar (read/write)'));
       body.appendChild(field('OAuth client ID', text(draft.googleClientId, '1234567890-abc.apps.googleusercontent.com', (v) => { draft.googleClientId = v.trim(); }), 'Google Cloud Console → enable the Calendar API → OAuth 2.0 Web client → add this site\'s origin to Authorized JavaScript origins. Leave blank to skip Google.'));

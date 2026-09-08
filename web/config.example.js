@@ -35,6 +35,7 @@ export default {
   calendars: [
     { type: 'local', name: 'Family', color: '#2bff66' },
     // { type: 'ics', name: 'School', url: 'https://example.org/calendar.ics', color: '#c98bdb' },
+    // { type: 'ha', entity: 'calendar.family', name: 'HA Family', color: '#7d9bff' },   // a Home Assistant calendar (hub must be connected)
   ],
   // Weather panel. provider: 'auto' (WeatherStar 4000+ where the US National Weather Service has
   // data, otherwise an Open-Meteo conditions card), or force 'weatherstar' / 'card'.

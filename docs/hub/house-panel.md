@@ -37,6 +37,11 @@ toggle (on by default for lights, switches, fans and covers; off for locks). Lig
 covers open or close, locks ask for confirmation first. On the **Command** screen the House panel is
 full width with bigger tiles; see the README on Family / Command screens.
 
+## Home Assistant calendars
+With the hub connected, the wizard's **Calendars** step lists every calendar Home Assistant has
+(`calendar.*` entities — Google, iCloud/CalDAV, local, whatever you set up there). Switch one on and its
+events show on the grid and the week strip, colour-coded and read-only, fetched through your server.
+
 ## Shopping-list sync
 Home Assistant's built-in **Shopping list** (`todo.shopping_list`) is what voice assistants feed.
 Turn on ☰ Display → *Hub shopping sync* on **one** screen (the wall display). Every 20 s that screen:
