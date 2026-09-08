@@ -187,7 +187,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         if self.path.split('?')[0] in ('/api/power', '/api/power.php'):
             try: return self._json(200, comed_prices())
             except Exception as e: return self._json(502, {'error': str(e)})  # noqa: BLE001
-        if self.path in ('/', '/index.php', '/index.html'):
+        if self.path.split('?')[0] in ('/', '/index.php', '/index.html'):
             self.path = '/app.html'
         if self.path.startswith('/includes/') or (self.path.startswith('/api/') and not self.path.split('?')[0] in ('/api/state', '/api/state.php', '/api/power', '/api/power.php')):
             self.send_error(403); return
