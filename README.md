@@ -145,11 +145,19 @@ tools/build-ws4kp.sh
 deploy.sh, deploy.env.example
 ```
 
-## Home Assistant and other hubs
-The planner publishes a read-only snapshot at `/api/state` (tonight's dinner, open shopping items,
-chores done, next events, outside temperature). Home Assistant's built-in REST sensor reads it with a
-few lines of YAML — see [docs/hub/home-assistant.md](docs/hub/home-assistant.md). Hosted installs
-protect it with a token.
+## Home Assistant, Home-IO and other hubs
+Both directions:
+- **Planner → hub:** a read-only snapshot at `/api/state` (tonight's dinner, open shopping items,
+  chores done, next events, outside temperature). Home Assistant's built-in REST sensor reads it with a
+  few lines of YAML — [docs/hub/home-assistant.md](docs/hub/home-assistant.md).
+- **Hub → planner:** a **House panel** of tiles you pick (thermostat, doors, who's home, locks,
+  lights, any sensor) and a **two-way shopping-list sync** with Home Assistant's Shopping list, so
+  "add milk" to a voice assistant lands on the wall — [docs/hub/house-panel.md](docs/hub/house-panel.md).
+  The hub token stays on your server. Home-IO is supported for tiles.
+
+## Not a family? It's a home dashboard too
+Skip kids and meals in the wizard and hide any panel in ☰ Display. What is left — calendar,
+WeatherStar, House tiles, notes — makes a good wall dashboard on its own.
 
 ## Accessibility
 Keyboard-navigable (Tab through panels, Enter/Space on days and events), screen-reader landmarks and

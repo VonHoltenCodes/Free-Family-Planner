@@ -6,7 +6,8 @@ import { mountCard, openMeteoConditions } from './wx-card.js';
 import { loadConfig, isConfigured } from './config-loader.js';
 import { openSetup } from './setup.js';
 import { stateSet } from './state-publisher.js';
-import { loadDisplay, applyLayout, applyTheme, startDim, openDisplaySettings } from './display.js';
+import { hub, mountHouse, startTodoSync } from './hub.js';
+import { loadDisplay, applyLayout, applyTheme, startDim, openDisplaySettings, setPanelAvailable } from './display.js';
 
 const config = await loadConfig();
 const display = loadDisplay();
@@ -112,7 +113,21 @@ async function refreshWx() {
   refreshWx(); setInterval(refreshWx, 10 * 60 * 1000);
 })();
 
+/* ---------- home hub: House panel + shopping-list sync ---------- */
+(async () => {
+  let st = null;
+  try { st = await hub.status(); } catch (e) { return; }   // static host / no endpoint: feature off
+  if (!st || st.type === 'none') return;
+  $('svc-hub').hidden = false; $('led-hub-label').textContent = st.type === 'homeio' ? 'HOME-IO' : 'HOME ASSISTANT';
+  const tiles = config.house?.tiles || [];
+  setPanelAvailable('house', tiles.length > 0); lastPortrait = null; fitCanvas();
+  $('house-sub').textContent = st.type === 'homeio' ? 'Home-IO' : 'Home Assistant';
+  if (tiles.length) mountHouse($('house-tiles'), tiles, (s) => led('led-hub', s));
+  if (display.hubSync && st.type === 'homeassistant') startTodoSync(() => listCache.shopping, (s) => led('led-hub', s));
+})();
+
 /* ---------- check lists: shopping + notes ---------- */
+const listCache = { shopping: [], notes: [] };
 function bindList(name, formId, inputId, listId, countId) {
   const list = $(listId); const input = $(inputId);
   $(formId).addEventListener('submit', async (e) => {
@@ -121,7 +136,7 @@ function bindList(name, formId, inputId, listId, countId) {
     try { await store.addListItem(name, text); } catch (err) { toast('Save failed'); console.error(err); }
   });
   store.watchList(name, (items) => {
-    led('led-fb', 'on'); stateSet(name, items);
+    led('led-fb', 'on'); stateSet(name, items); listCache[name] = items;
     list.innerHTML = '';
     if (!items.length) { list.appendChild(el('li', 'empty', 'Nothing here.')); }
     items.forEach((it) => {

@@ -5,11 +5,12 @@ import { deepMerge, DEFAULTS, LS_KEY } from './config-loader.js';
 import { testFirebase, testSync } from './store.js';
 import { lookupPoint, WS_SCREENS } from './wx.js';
 import { openMeteoConditions } from './wx-card.js';
+import { hub, tileKind } from './hub.js';
 import { loadScript } from './gcal.js';
 
 const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
 const slug = (s) => (s || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || `kid-${Date.now()}`;
-const STEPS = ['Family', 'Kids', 'Location', 'Data', 'Calendars', 'Weather', 'Save'];
+const STEPS = ['Family', 'Kids', 'Location', 'Data', 'Calendars', 'Weather', 'Home hub', 'Save'];
 const KID_COLORS = ['#ff69b4', '#4169e1', '#2bff66', '#ffd11a', '#ff9f5b', '#c98bdb', '#2bd0ff', '#ff3b2e'];
 
 export function openSetup(current, { firstRun = false } = {}) {
@@ -53,7 +54,7 @@ export function openSetup(current, { firstRun = false } = {}) {
     back.disabled = step === 0; next.textContent = step === STEPS.length - 1 ? 'Save' : 'Next ▶';
     const f = draft.family;
     if (step === 0) {
-      body.appendChild(el('p', 'lead', firstRun ? 'Welcome! A few questions and the wall display is yours. Nothing here leaves your own setup.' : 'Names shown in the header and the status bar.'));
+      body.appendChild(el('p', 'lead', firstRun ? 'Welcome! A few questions and the wall display is yours. Nothing here leaves your own setup. Not a family planner person? Skip kids and meals, hide any panel later in ☰ Display, and use it as a home dashboard.' : 'Names shown in the header and the status bar.'));
       body.appendChild(field('Family title', text(f.title, 'OUR FAMILY', (v) => { f.title = v; })));
       body.appendChild(field('Subtitle', text(f.subtitle, 'CENTRAL COMMAND', (v) => { f.subtitle = v; })));
       body.appendChild(field('Status bar text', text((f.footer || []).join(' • '), 'FAMILY COMMAND CENTER • EST. 2025 • YOUR TOWN, ST', (v) => { f.footer = v.split('•').map((s) => s.trim()).filter(Boolean); }), 'separate items with •'));
@@ -154,6 +155,31 @@ export function openSetup(current, { firstRun = false } = {}) {
       body.appendChild(opt2('Speed', [[0.5, 'Slow'], [0.75, '¾'], [1, 'Normal'], [1.5, 'Fast'], [2, 'Fastest']], wx.speed, (v) => { wx.speed = v; }));
       body.appendChild(opt2('Scan lines', [[false, 'Off'], [true, 'CRT look']], wx.scanLines, (v) => { wx.scanLines = v; }));
     } else if (step === 6) {
+      const hs = draft.house = { tiles: [], ...(draft.house || {}) }; let hubCfg = { type: 'none', url: '', todoEntity: 'todo.shopping_list', hasToken: false }; let entities = null;
+      body.appendChild(el('p', 'lead', 'Optional: connect a home hub. The House panel shows the tiles you pick, and the shopping list can sync with the hub\'s to-do list (voice assistants feed it). The hub address and token are stored on the server, never in the page.'));
+      const typeRow = opt2('Hub', [['none', 'None'], ['homeassistant', 'Home Assistant'], ['homeio', 'Home-IO']], 'none', (v) => { hubCfg.type = v; paintHub(); }); body.appendChild(typeRow);
+      const hubBox = el('div'); body.appendChild(hubBox);
+      const urlI = text('', 'http://homeassistant.local:8123', (v) => { hubCfg.url = v.trim(); }); const tokI = el('input'); tokI.type = 'password'; tokI.placeholder = 'long-lived access token (leave blank to keep the saved one)'; tokI.autocomplete = 'off';
+      const todoI = text('todo.shopping_list', 'todo.shopping_list', (v) => { hubCfg.todoEntity = v.trim(); });
+      const tokLabel = field('Access token', tokI, 'Home Assistant → your profile → Security → Long-lived access tokens → Create. Home-IO: leave blank unless you enabled auth.');
+      hubBox.append(field('Hub address', urlI, 'reachable from this server — a LAN address is fine'), tokLabel, field('Shopping to-do list entity', todoI, 'Home Assistant only; default is the built-in Shopping list'));
+      const saveTest = testBtn('Save hub & test', async () => { await hub.save({ type: hubCfg.type, url: hubCfg.url, token: tokI.value || undefined, todoEntity: hubCfg.todoEntity }); tokI.value = ''; const r = await hub.test(); entities = await hub.entities(); drawEnts(); return `${r.message} — ${entities.length} entities available`; });
+      hubBox.appendChild(saveTest);
+      // tiles
+      hubBox.appendChild(el('div', 'sect', 'House panel tiles'));
+      const tileList = el('div', 'kid-list'); hubBox.appendChild(tileList);
+      const drawTiles = () => { tileList.innerHTML = ''; hs.tiles.forEach((t, i) => { const row = el('div', 'kid-row'); row.append(text(t.label, 'Label', (v) => { t.label = v; }), el('span', 'eid', t.entity)); const rm = el('button', 'btn sm danger', '×'); rm.type = 'button'; rm.addEventListener('click', () => { hs.tiles.splice(i, 1); drawTiles(); }); row.appendChild(rm); tileList.appendChild(row); }); if (!hs.tiles.length) tileList.appendChild(el('div', 'hint', 'no tiles yet — save & test the hub, then pick entities below')); };
+      drawTiles();
+      const search = text('', 'filter entities…', () => drawEnts()); const entList = el('div', 'ent-list'); hubBox.append(field('Add a tile', search), entList);
+      const drawEnts = () => { entList.innerHTML = ''; if (!entities) { entList.appendChild(el('div', 'hint', 'save & test the hub to list entities')); return; } const q = norm2(search.value);
+        entities.filter((e) => !q || norm2(e.name).includes(q) || norm2(e.id).includes(q)).slice(0, 60).forEach((e) => { const row = el('div', 'ent-row'); row.append(el('span', null, e.name), el('span', 'hint', `${tileKind(e)}${e.state != null ? ` · ${e.state}${e.unit ? ' ' + e.unit : ''}` : ''}`), el('span', 'eid', e.id));
+          row.addEventListener('click', () => { if (!hs.tiles.some((t) => t.entity === e.id)) { hs.tiles.push({ entity: e.id, label: e.name, kind: tileKind(e) }); drawTiles(); } }); entList.appendChild(row); }); };
+      const norm2 = (s) => (s || '').toLowerCase();
+      hubBox.appendChild(el('small', 'hint', 'Shopping-list sync is turned on per screen in ☰ Display → "Hub shopping sync" (one screen only, normally the wall display).'));
+      const paintHub = () => { hubBox.hidden = hubCfg.type === 'none'; todoI.parentElement.hidden = hubCfg.type !== 'homeassistant'; };
+      hub.status().then((s) => { hubCfg = { ...hubCfg, ...s }; urlI.value = s.url || ''; todoI.value = s.todoEntity || 'todo.shopping_list'; typeRow.querySelectorAll('.btn').forEach((b) => b.classList.toggle('on', b.textContent === ({ none: 'None', homeassistant: 'Home Assistant', homeio: 'Home-IO' })[s.type])); if (s.type !== 'none') { hub.entities().then((e) => { entities = e; drawEnts(); }).catch(() => {}); } paintHub(); }).catch(() => { hubBox.hidden = true; typeRow.hidden = true; body.appendChild(el('div', 'hint', 'No hub endpoint on this host (static hosting) — the House panel needs the local server or the PHP install.')); });
+      paintHub(); drawEnts();
+    } else if (step === 7) {
       body.appendChild(el('p', 'lead', 'Review and save. The page reloads with the new settings.'));
       const pre = el('pre', 'preview', JSON.stringify(exportable(), null, 2)); body.appendChild(pre);
       body.appendChild(el('small', 'hint', 'Saved to config.js on the server when this install can write it (hosted with PHP, or tools/serve.py). Otherwise it is kept in this browser and you can download config.js to place next to app.html.'));

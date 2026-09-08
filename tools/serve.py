@@ -18,6 +18,9 @@ ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'web')
 DATA_DIR = os.environ.get('FP_DATA_DIR') or os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'data')
 DB_FILE = os.path.join(DATA_DIR, 'planner.json')
 STATE_FILE = os.path.join(DATA_DIR, 'state.json')
+HUB_FILE = os.path.join(DATA_DIR, 'hub.json')
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import hub_adapter  # noqa: E402
 _db_lock = threading.Lock()
 COLLECTIONS = ('notes', 'shopping', 'settings', 'chores', 'events')
 
@@ -97,6 +100,38 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         self.send_response(200); self.send_header('Content-Type', 'application/json'); self.send_header('Access-Control-Allow-Origin', '*')
         body = json.dumps(snap).encode(); self.send_header('Content-Length', str(len(body))); self.end_headers(); self.wfile.write(body)
 
+    def _hub(self):
+        """Home hub proxy — same ops as web/api/hub.php. The hub URL/token stay in data/hub.json."""
+        q = {k: v[0] for k, v in parse_qs(urlsplit(self.path).query).items()}; op = q.get('op', '')
+        body = {}
+        if self.command == 'POST':
+            try: body = json.loads(self.rfile.read(int(self.headers.get('Content-Length', '0')) or b'{}'))
+            except ValueError: return self._json(400, {'error': 'bad body'})
+        try:
+            with open(HUB_FILE) as f: hub = json.load(f)
+        except (OSError, ValueError): hub = {}
+        try:
+            if op == 'get': return self._json(200, {'type': hub.get('type', 'none'), 'url': hub.get('url', ''), 'hasToken': bool(hub.get('token')), 'todoEntity': hub.get('todoEntity', 'todo.shopping_list')})
+            if op == 'save':
+                if body.get('type') not in ('none', 'homeassistant', 'homeio'): return self._json(400, {'error': 'bad type'})
+                new = {'type': body['type'], 'url': (body.get('url') or '').strip(), 'todoEntity': (body.get('todoEntity') or 'todo.shopping_list').strip(), 'token': body.get('token') if body.get('token') else hub.get('token', '')}
+                os.makedirs(DATA_DIR, exist_ok=True)
+                with open(HUB_FILE, 'w') as f: json.dump(new, f)
+                try: os.chmod(HUB_FILE, 0o600)
+                except OSError: pass
+                return self._json(200, {'ok': True})
+            a = hub_adapter.make(hub)
+            if op == 'test': return self._json(200, {'ok': True, 'message': a.test()})
+            if op == 'entities': return self._json(200, {'entities': a.entities()})
+            if op == 'states': return self._json(200, {'states': a.states([i for i in q.get('ids', '').split(',') if i])})
+            if op == 'todo': return self._json(200, {'items': a.todo_list()})
+            if op == 'todo-add': a.todo_add(body['text']); return self._json(200, {'ok': True})
+            if op == 'todo-set': a.todo_set(body['uid'], bool(body.get('completed'))); return self._json(200, {'ok': True})
+            if op == 'todo-remove': a.todo_remove(body['uid']); return self._json(200, {'ok': True})
+            return self._json(400, {'error': 'unknown op'})
+        except hub_adapter.HubError as e: return self._json(502, {'error': str(e)})
+        except KeyError as e: return self._json(400, {'error': f'missing {e}'})
+
     def do_PUT(self):
         if self.path.startswith('/api/db.php'): return self._db()
         if self.path.startswith('/api/state'): return self._state()
@@ -119,19 +154,21 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         if self.path.startswith('/api/db.php'): return self._db()
         if self.path.startswith('/api/ics.php'): return self._ics_proxy()
         if self.path.split('?')[0] in ('/api/state', '/api/state.php'): return self._state()
+        if self.path.startswith('/api/hub.php'): return self._hub()
         if self.path in ('/', '/index.php', '/index.html'):
             self.path = '/app.html'
         if self.path.startswith('/includes/') or (self.path.startswith('/api/') and not self.path.split('?')[0] in ('/api/state', '/api/state.php')):
             self.send_error(403); return
         return super().do_GET()
     def do_POST(self):
+        if self.path.startswith('/api/hub.php'): return self._hub()
         # the ⚙ setup wizard posts the config here (same path as the hosted PHP endpoint)
         if self.path.split('?')[0] not in ('/save-config.php', '/save-config'):
             self.send_error(404); return
         try:
             n = int(self.headers.get('Content-Length', '0')); cfg = json.loads(self.rfile.read(n) or b'{}')
             if not isinstance(cfg, dict) or 'family' not in cfg or 'location' not in cfg: raise ValueError('invalid config')
-            clean = {k: cfg[k] for k in ('family', 'location', 'firebase', 'googleClientId', 'holidayCalendarId', 'backend', 'calendars', 'weather') if k in cfg}
+            clean = {k: cfg[k] for k in ('family', 'location', 'firebase', 'googleClientId', 'holidayCalendarId', 'backend', 'calendars', 'weather', 'house') if k in cfg}
             target = os.path.join(ROOT, 'config.js')
             if os.path.exists(target): shutil.copy(target, target + '.bak')
             with open(target, 'w') as f:

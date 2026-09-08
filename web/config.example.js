@@ -39,4 +39,11 @@ export default {
   // hourly, hourly-graph, travel, regional-forecast, local-forecast, extended-forecast, almanac,
   // spc-outlook, radar). speed: 0.5–2. scanLines: CRT look.
   weather: { provider: 'auto', screens: { hourly: false, travel: false }, speed: 1, scanLines: false },
+  // House panel tiles from your home hub (Home Assistant or Home-IO). The hub URL + token are NOT
+  // here — the ⚙ wizard stores them server-side. Pick tiles in the wizard; kind is inferred from
+  // the entity (climate, door, presence, lock, onoff, value) or set it explicitly.
+  house: { tiles: [
+    // { entity: 'climate.hallway', label: 'Hallway' },
+    // { entity: 'binary_sensor.front_door', label: 'Front door' },
+  ] },
 };

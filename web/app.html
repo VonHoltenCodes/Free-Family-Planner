@@ -7,7 +7,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <title>Family Planner</title>
 <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="assets/css/planner.css?v=13">
+<link rel="stylesheet" href="assets/css/planner.css?v=15">
 </head>
 <body>
 <div class="scaler">
@@ -84,6 +84,10 @@
         <div class="tbar"><span class="tag"></span><h2>Chores</h2></div>
         <div class="body"><div class="kids" id="kids"></div></div>
       </section>
+      <section class="panel" id="p-house" role="region" aria-label="House" hidden>
+        <div class="tbar"><span class="tag gold"></span><h2>House</h2><span class="grow"></span><span class="sub" id="house-sub"></span></div>
+        <div class="body"><div class="tiles" id="house-tiles"></div></div>
+      </section>
       <section class="panel" id="p-notes" role="region" aria-label="Notes">
         <div class="tbar"><span class="tag blue"></span><h2>Notes</h2></div>
         <div class="body">
@@ -102,6 +106,7 @@
     <span class="svc"><span class="led" id="led-fb"></span><span id="led-fb-label">DATA</span></span>
     <span class="svc"><span class="led" id="led-gc"></span>GOOGLE CAL</span>
     <span class="svc"><span class="led" id="led-wx"></span><span id="led-wx-label">NWS</span></span>
+    <span class="svc" id="svc-hub" hidden><span class="led" id="led-hub"></span><span id="led-hub-label">HUB</span></span>
     <button class="btn sm" id="btn-display" title="Display settings">☰ DISPLAY</button><button class="btn sm" id="btn-setup" title="Setup">⚙ SETUP</button><span class="sep">•</span><a href="logout.php">SIGN OUT</a>
   </footer>
 
@@ -130,6 +135,6 @@
 </div>
 </div>
 
-<script type="module" src="assets/js/planner.js?v=13"></script>
+<script type="module" src="assets/js/planner.js?v=14"></script>
 </body>
 </html>

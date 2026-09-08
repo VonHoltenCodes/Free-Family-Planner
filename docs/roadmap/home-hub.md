@@ -28,6 +28,11 @@ call(service, data)              # later, for toggles
 - The browser only ever talks to our server (`api/hub.php?op=…`); the server talks to the hub.
 - Hosted installs: feature stays hidden unless a hub URL is configured and reachable from the server.
 
+## As built
+- `web/assets/js/hub.js`: proxy client, tile kinds (`climate`, `door`, `motion`, `presence`, `lock`, `onoff`, `cover`, `weather`, `value`) inferred from domain + device_class, `startTodoSync()`.
+- Sync rules: pairs are kept in this browser (`fp.hubTodoMap`); new items on either side are created on the other; completion changes go from whichever side changed since the last sync (hub wins a tie); an item deleted on one side is deleted on the other; already-completed unsynced items are left alone. Only screens with ☰ Display → "Hub shopping sync" run it.
+- `tools/fake-ha.py` is a stand-in Home Assistant (states + todo services) used by the tests and handy for contributors.
+
 ## Open questions
 - Push instead of poll? HA webhooks → our `/api/db.php` would need a shared secret; poll is fine for v1.
 - Which entity domains to allow in the House panel v1: `climate`, `binary_sensor`, `sensor`, `person`, `lock`, `switch`.
@@ -36,8 +41,8 @@ call(service, data)              # later, for toggles
 ## Checklist
 - [ ] design agreed in #19
 - [x] `/api/state` + HA sensor docs (PR #21, merged)
-- [ ] hub adapter interface + Home Assistant adapter (serve.py + PHP)
-- [ ] shopping-list sync
-- [ ] House panel + wizard step
-- [ ] Home-IO adapter
-- [ ] README / ROADMAP / docs/hub
+- [x] hub adapter interface + Home Assistant adapter (serve.py + PHP)
+- [x] shopping-list sync (two-way, text-paired, one screen runs it)
+- [x] House panel + wizard step (entity picker, tiles in config.house)
+- [x] Home-IO adapter (devices → tiles; no to-do list)
+- [x] README / ROADMAP / docs/hub

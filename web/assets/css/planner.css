@@ -470,3 +470,22 @@ select option{background:var(--panel);color:var(--text);}
 }
 /* keyboard mode: the canvas is shifted, not shrunk, while a field has focus (see keyboardGuard in planner.js) */
 .canvas.kbd{transition:transform .15s ease-out;}
+
+/* ---------- House panel (home hub tiles) ---------- */
+.tiles{flex:1;min-height:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));grid-auto-rows:minmax(84px,1fr);gap:6px;overflow:hidden;}
+.tile{display:flex;flex-direction:column;justify-content:center;gap:2px;padding:6px 10px;background:var(--panel-2);border:1px solid var(--grid-line);border-left:4px solid var(--text-mute);border-radius:3px;min-width:0;}
+.tile.on{border-left-color:var(--grn);}
+.tile.warn{border-left-color:var(--amber);}
+.tile.offline{opacity:.45;}
+.tile .tl{font-family:var(--font-pixel);font-size:11px;letter-spacing:1.5px;color:var(--text-dim);text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.tile .tb{font-family:var(--font-lcd);font-size:26px;color:var(--lcd);text-shadow:0 0 8px rgba(30,255,30,.5);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.tile.warn .tb{color:var(--amber);text-shadow:0 0 8px rgba(255,209,26,.5);}
+.tile.offline .tb,.tile:not(.on):not(.warn) .tb{color:var(--text-dim);text-shadow:none;}
+.tile.presence .tb,.tile.door .tb,.tile.lock .tb,.tile.onoff .tb,.tile.motion .tb,.tile.cover .tb,.tile.climate .tb,.tile.weather .tb{font-family:var(--font-pixel);font-size:22px;letter-spacing:2px;}
+.tile.climate .tb,.tile.weather .tb{font-size:26px;}
+.tile .ts{font-size:12px;color:var(--text-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.canvas.portrait .tiles{grid-template-columns:repeat(auto-fill,minmax(160px,1fr));}
+.dlg .ent-list{max-height:220px;overflow:auto;display:flex;flex-direction:column;gap:3px;border:1px solid var(--grid-line-2);border-radius:3px;padding:4px;background:var(--well);}
+.dlg .ent-row{display:flex;gap:8px;align-items:center;padding:3px 6px;border-radius:3px;cursor:pointer;font-size:14px;}
+.dlg .ent-row:hover{background:var(--panel-2);}
+.dlg .ent-row .eid{font-size:11px;color:var(--text-mute);margin-left:auto;font-family:var(--font-mono,monospace);}
