@@ -604,12 +604,13 @@ select option{background:var(--panel);color:var(--text);}
 .dlg .ent-row .eid{font-size:11px;color:var(--text-mute);margin-left:auto;font-family:var(--font-mono,monospace);}
 
 /* ---------- screen tabs (Family / Command) — LCARS pills in the rack ---------- */
-.tabs{display:flex;gap:6px;margin-left:8px;}
-.tabs .tab{font-family:var(--font-pixel);font-size:13px;letter-spacing:2px;padding:6px 16px;border-radius:0 14px 14px 0;background:var(--cyan-dim);color:#04121a;min-height:30px;}
-.tabs .tab:first-child{border-radius:14px 0 0 14px;}
+.tabs{display:flex;gap:4px;margin:0 6px;}
+.tabs .tab{font-family:var(--font-pixel);font-size:11px;letter-spacing:2px;padding:0 14px;border-radius:0 10px 10px 0;background:var(--cyan-dim);color:#04121a;min-height:20px;line-height:20px;}
+.tabs .tab:first-child{border-radius:10px 0 0 10px;}
 .tabs .tab.on{background:var(--lc-orange);color:#000;box-shadow:0 0 10px rgba(255,159,91,.6);}
 .tabs .tab:focus-visible{outline:2px solid #fff;}
-.canvas.portrait .tabs .tab{font-size:11px;padding:5px 10px;letter-spacing:1px;}
+.canvas.portrait .tabs .tab{padding:0 10px;letter-spacing:1px;}
+.status .tabs .tab{min-height:20px;}
 .canvas.theme-lcars .tabs .tab{background:var(--lc-blue);}
 .canvas.theme-lcars .tabs .tab.on{background:var(--lc-orange);}
 .canvas.theme-paper .tabs .tab{background:#4a7fb5;color:#fff;}
