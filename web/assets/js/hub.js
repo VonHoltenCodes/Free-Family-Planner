@@ -30,6 +30,7 @@ export function tileKind(ent) {
   if (d === 'weather') return 'weather';
   return 'value';
 }
+const WX_WORDS = { partlycloudy: 'partly cloudy', 'clear-night': 'clear night', 'lightning-rainy': 'thunderstorms', 'snowy-rainy': 'snow and rain', pouring: 'heavy rain', rainy: 'rain', snowy: 'snow', sunny: 'sunny', cloudy: 'cloudy', fog: 'fog', hail: 'hail', windy: 'windy', 'windy-variant': 'windy', exceptional: 'severe' };
 const fmt = (n) => (n == null || n === '' ? '—' : (Number.isFinite(+n) ? String(Math.round(+n * 10) / 10) : String(n)));
 function tileFace(kind, s) {
   const st = s?.state ?? 'unknown'; const a = s?.attrs || {};
@@ -41,7 +42,7 @@ function tileFace(kind, s) {
     case 'motion': return { big: st === 'on' ? 'MOTION' : 'CLEAR', small: '', on: st === 'on' };
     case 'onoff': return { big: st === 'on' ? 'ON' : st === 'off' ? 'OFF' : String(st).toUpperCase(), small: a.brightness != null ? `${Math.round(a.brightness / 2.55)}%` : '', on: st === 'on' };
     case 'cover': return { big: String(st).toUpperCase(), small: '', on: st === 'closed' };
-    case 'weather': return { big: a.temperature != null ? `${fmt(a.temperature)}°` : String(st), small: String(st).replace(/-/g, ' '), on: true };
+    case 'weather': return { big: a.temperature != null ? `${fmt(a.temperature)}°` : String(st), small: WX_WORDS[st] || String(st).replace(/-/g, ' '), on: true };
     default: return { big: `${fmt(st)}${s?.unit ? ` ${s.unit}` : ''}`, small: '', on: st !== 'unavailable' && st !== 'unknown' };
   }
 }

@@ -43,6 +43,10 @@ always-on screen. A different to-do entity can be set in the Home hub step.
 Skip kids and meals in the wizard, hide any panel in ☰ Display, and you have a wall dashboard:
 calendar, WeatherStar, House tiles, notes. The header title is whatever you type.
 
+## Verified against
+Home Assistant 2026.9.1 (container) with the demo platform: thermostats, locks, covers, lights, motion,
+sensors, weather, and the built-in Shopping list in both directions.
+
 ## Testing without a real Home Assistant
 `python3 tools/fake-ha.py` runs a stand-in on port 8123 (token `test-token`) with a handful of
 entities and a shopping list. Point the Home hub step at `http://127.0.0.1:8123`.
