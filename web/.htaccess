@@ -23,6 +23,10 @@
     Allow from all
 </FilesMatch>
 
+<Files "config.js">
+    Header set Cache-Control "no-store"
+</Files>
+
 <IfModule mod_headers.c>
     # The site root sets X-Frame-Options DENY with "Header always"; that blocks the WeatherStar
     # iframe. Override in the same (always) table so the response carries exactly one value.

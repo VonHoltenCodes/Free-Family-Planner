@@ -7,10 +7,12 @@ import { loadConfig, isConfigured } from './config-loader.js';
 import { openSetup } from './setup.js';
 import { stateSet } from './state-publisher.js';
 import { hub, mountHouse, startTodoSync } from './hub.js';
-import { loadDisplay, applyLayout, applyTheme, startDim, openDisplaySettings, setPanelAvailable, effectiveMode, currentScreen, SCREENS } from './display.js';
+import { mountPower } from './power.js';
+import { loadDisplay, applyLayout, applyTheme, startDim, openDisplaySettings, setPanelAvailable, currentScreen, defaultTab, SCREENS, PANELS } from './display.js';
 
 const config = await loadConfig();
 const display = loadDisplay();
+if (!display.active) display.active = defaultTab(config);
 applyTheme(display);
 store.initStore(config);
 
@@ -56,7 +58,7 @@ function fitCanvas() {
   if (keyboardGuard()) return;
   const portrait = display.orientation === 'auto' ? window.innerHeight > window.innerWidth : display.orientation === 'portrait';
   const c = $('canvas'); c.classList.toggle('portrait', portrait);
-  if (portrait !== lastPortrait) { lastPortrait = portrait; applyLayout(display, portrait, currentScreen(display, config)); renderTabs(); }
+  if (portrait !== lastPortrait) { lastPortrait = portrait; applyLayout(display, portrait, currentScreen(display)); renderTabs(); }
   const [w, h] = portrait ? [1080, 1920] : [1920, 1080];
   const s = Math.min(window.innerWidth / w, window.innerHeight / h);
   c.style.transform = `scale(${s})`;
@@ -64,19 +66,22 @@ function fitCanvas() {
 }
 window.addEventListener('resize', fitCanvas);
 window.visualViewport?.addEventListener('resize', fitCanvas);
+['orientationchange', 'fullscreenchange', 'pageshow', 'load'].forEach((ev) => window.addEventListener(ev, () => setTimeout(fitCanvas, 150)));
+[300, 1000, 3000].forEach((ms) => setTimeout(fitCanvas, ms));   // Android browsers settle the viewport (URL bar, nav bar) after load
+setInterval(() => { if (!isField(document.activeElement) && (window.innerWidth !== baseViewport.w || window.innerHeight !== baseViewport.h)) fitCanvas(); }, 5000);
 document.addEventListener('focusin', (e) => { if (isField(e.target)) setTimeout(fitCanvas, 250); });
 document.addEventListener('focusout', () => setTimeout(fitCanvas, 100));
 fitCanvas();
 
 /* ---------- screens: Family / Command tabs ---------- */
 function renderTabs() {
-  const nav = $('tabs'); const mode = effectiveMode(display, config); nav.hidden = mode !== 'both'; nav.innerHTML = '';
-  if (mode !== 'both') return;
+  const nav = $('tabs'); nav.hidden = false; nav.innerHTML = '';
   Object.entries(SCREENS).forEach(([k, name]) => { const b = el('button', 'tab' + (display.active === k ? ' on' : ''), name.toUpperCase()); b.type = 'button'; b.setAttribute('aria-pressed', String(display.active === k)); b.addEventListener('click', () => switchScreen(k)); nav.appendChild(b); });
 }
-function switchScreen(k) { if (display.active === k) return; display.active = k; localStorage.setItem('fp.display', JSON.stringify(display)); lastPortrait = null; fitCanvas(); }
-let lastTouch = 0;
-setInterval(() => { if (effectiveMode(display, config) === 'both' && display.rotateMinutes > 0 && !document.querySelector('.overlay:not([hidden])') && Date.now() - lastTouch > 60_000) switchScreen(display.active === 'family' ? 'command' : 'family'); }, 60_000);
+function switchScreen(k) { if (display.active === k) return; display.active = k; lastSwitch = Date.now(); localStorage.setItem('fp.display', JSON.stringify(display)); lastPortrait = null; fitCanvas(); }
+let lastTouch = Date.now(); let lastSwitch = Date.now();
+setInterval(() => { const idle = Date.now() - lastTouch > 120_000; const typing = isField(document.activeElement); const dialog = !!document.querySelector('.overlay:not([hidden])');
+  if (display.rotateMinutes > 0 && idle && !typing && !dialog && Date.now() - lastSwitch >= display.rotateMinutes * 60_000) { lastSwitch = Date.now(); switchScreen(display.active === 'family' ? 'command' : 'family'); } }, 15_000);
 ['pointerdown', 'keydown'].forEach((ev) => document.addEventListener(ev, () => { lastTouch = Date.now(); }, { passive: true }));
 
 /* ---------- toast + LEDs ---------- */
@@ -123,6 +128,17 @@ async function refreshWx() {
   else { $('wx-frame').src = weatherStarUrl(config.location, config.weather, display.units); }
   refreshWx(); setInterval(refreshWx, 10 * 60 * 1000);
 })();
+
+/* ---------- electricity pricing (ComEd hourly) ---------- */
+if (config.power?.provider === 'comed') {
+  setPanelAvailable('power', true); lastPortrait = null; fitCanvas();
+  const alert = $('hdr-alert');
+  mountPower($('power'), config.power, {
+    onStatus: (s) => { $('power-sub').textContent = s === 'on' ? 'ComEd hourly' : 'ComEd — no data'; },
+    onAlert: (kind, price) => { alert.hidden = !kind; alert.className = `hdr-alert${kind === 'soon' ? ' soon' : ''}`; alert.textContent = kind === 'now' ? `⚡ PRICE SPIKE ${price.toFixed(1)}¢` : kind === 'soon' ? '⚡ SPIKE SOON' : ''; },
+    publish: (p) => stateSet('power', p),
+  });
+}
 
 /* ---------- home hub: House panel + shopping-list sync ---------- */
 (async () => {

@@ -642,3 +642,40 @@ select option{background:var(--panel);color:var(--text);}
 .tile.camera .tl{position:absolute;left:8px;top:6px;z-index:1;background:rgba(0,0,0,.55);padding:2px 6px;border-radius:2px;}
 .tile.camera img.cam{width:100%;height:100%;object-fit:cover;display:block;}
 .panel.wide .tile.camera{grid-column:span 2;}
+
+/* ---------- Electricity pricing panel (ComEd hourly) ---------- */
+.power{flex:1;min-height:0;display:flex;flex-direction:column;gap:6px;}
+.power.offline{opacity:.5;}
+.pw-top{display:flex;gap:12px;align-items:center;}
+.pw-left{display:flex;align-items:baseline;gap:8px;}
+.pw-big{font-family:var(--font-lcd);font-weight:700;font-size:44px;color:var(--lcd);text-shadow:0 0 8px rgba(30,255,30,.6);line-height:1;}
+.power.high .pw-big{color:var(--amber);text-shadow:0 0 8px rgba(255,209,26,.6);}
+.power.spike .pw-big{color:var(--red);text-shadow:0 0 10px rgba(255,59,46,.7);}
+.pw-unit{font-family:var(--font-pixel);font-size:12px;letter-spacing:1px;color:var(--text-dim);}
+.pw-word{font-family:var(--font-pixel);font-size:14px;letter-spacing:3px;color:var(--text-dim);margin-left:6px;}
+.power.spike .pw-word{color:var(--red);}
+.power.high .pw-word{color:var(--amber);}
+.pw-banner{font-family:var(--font-pixel);font-size:12px;letter-spacing:1px;padding:5px 8px;border-radius:3px;background:rgba(255,59,46,.15);border:1px solid var(--red);color:#ffb3ad;}
+.pw-banner[hidden]{display:none;}
+.pw-strip{flex:1;min-height:56px;display:flex;align-items:flex-end;gap:2px;padding-top:4px;border-top:1px solid var(--grid-line);}
+.pw-bar{flex:1;min-width:0;height:100%;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:2px;}
+.pw-fill{width:100%;background:var(--grn-lo);border-radius:2px 2px 0 0;min-height:4px;}
+.pw-bar.high .pw-fill{background:var(--amber);}
+.pw-bar.spike .pw-fill{background:var(--red);}
+.pw-bar.now .pw-fill{box-shadow:0 0 0 1px #fff;}
+.pw-bar .pw-h{font-family:var(--font-pixel);font-size:8px;color:var(--text-mute);letter-spacing:0;}
+.pw-bar:nth-child(2n) .pw-h{visibility:hidden;}
+.pw-sub{font-family:var(--font-pixel);font-size:10px;letter-spacing:1px;color:var(--text-mute);}
+.panel.wide .pw-big{font-size:64px;}
+.panel.wide .pw-strip{min-height:120px;}
+.panel.wide .pw-bar .pw-h{font-size:10px;}
+.panel.wide .pw-bar:nth-child(2n) .pw-h{visibility:visible;}
+/* header alert pill (⚡ price spike) */
+.hdr-alert{font-family:var(--font-pixel);font-size:12px;letter-spacing:2px;padding:4px 10px;border-radius:3px;background:var(--red);color:#fff;animation:pw-blink 1.2s steps(2) infinite;}
+.hdr-alert.soon{background:var(--amber);color:#000;animation:none;}
+.hdr-alert[hidden]{display:none;}
+@keyframes pw-blink{50%{opacity:.55;}}
+.canvas.theme-eink .pw-big,.canvas.theme-eink .power.spike .pw-big,.canvas.theme-eink .power.high .pw-big{color:#1d1d1b;font-family:var(--font-pixel);font-weight:800;}
+.canvas.theme-eink .pw-fill,.canvas.theme-eink .pw-bar.high .pw-fill{background:#7a7975;}
+.canvas.theme-eink .pw-bar.spike .pw-fill{background:#1d1d1b;}
+.canvas.theme-eink .pw-banner,.canvas.theme-eink .hdr-alert{background:#1d1d1b;color:#f6f5f0;border-color:#1d1d1b;animation:none;}

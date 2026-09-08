@@ -1,9 +1,9 @@
 // Free Family Planner — site configuration.
 // Copy to config.js and fill in your own values. config.js is gitignored.
 export default {
-  // What new displays show: 'family' (planner), 'command' (home central command: house controls,
-  // weather, calendar), or 'both' (tabs). Each display can override this in ☰ Display.
-  defaultMode: 'both',
+  // The tab a display starts on: 'family' (planner) or 'command' (house controls + calendar).
+  // Both tabs are always available in the status bar.
+  defaultTab: 'family',
   family: {
     title: 'OUR FAMILY',            // header, line 1
     subtitle: 'CENTRAL COMMAND',    // header, line 2
@@ -43,6 +43,9 @@ export default {
   // hourly, hourly-graph, travel, regional-forecast, local-forecast, extended-forecast, almanac,
   // spc-outlook, radar). speed: 0.5–2. scanLines: CRT look.
   weather: { provider: 'auto', screens: { hourly: false, travel: false }, speed: 1, scanLines: false },
+  // Electricity pricing: ComEd (Illinois) Hourly Pricing customers get a live ¢/kWh panel with the
+  // day-ahead hours and SPIKE warnings above warnAbove — useful for timing laundry, dishwasher, EV.
+  power: { provider: 'none', warnAbove: 8 },
   // House panel tiles from your home hub (Home Assistant or Home-IO). The hub URL + token are NOT
   // here — the ⚙ wizard stores them server-side. Pick tiles in the wizard; kind is inferred from
   // the entity (climate, door, presence, lock, onoff, value) or set it explicitly.

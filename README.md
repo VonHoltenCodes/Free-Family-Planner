@@ -111,11 +111,11 @@ cd web && python3 -m http.server 8765 --bind 127.0.0.1   # open http://127.0.0.1
 Firestore, NWS and WeatherStar work locally; Google sign-in only works on an authorized origin.
 
 ## Two faces: Family Planner and Home Central Command
-The same display can be a **family planner** (calendar, lists, meals, chores, weather), a **home
-central command** (a big House panel of tappable controls from your hub, plus the calendar), or
-**both** with a FAMILY / COMMAND tab switch in the header and optional auto-rotation. Pick the
-starting point in the wizard; every screen can override it in ☰ Display, where each face has its
-own panel order, hidden panels, and which panels go full width.
+The same display is both a **family planner** (calendar, lists, meals, chores, weather) and a **home
+central command** (a big House panel of tappable controls from your hub, electricity prices, the
+calendar). FAMILY and COMMAND tabs sit in the status bar; the wizard picks the default tab and ☰
+Display can auto-switch them on a timer (never while someone is touching or typing). Each face has
+its own panel order, hidden panels, and which panels go full width.
 
 House tiles on the Command screen can be **tap to control**: lights, switches and fans toggle,
 covers open and close, locks ask for confirmation. Camera tiles show a live still refreshed every
@@ -156,6 +156,14 @@ web/                 everything that gets deployed
 tools/build-ws4kp.sh
 deploy.sh, deploy.env.example
 ```
+
+## Electricity prices (ComEd Hourly Pricing)
+Illinois families on ComEd's hourly plan get an **Electricity** panel: the live ¢/kWh, the rest of
+today's day-ahead hours (and tomorrow's once ComEd posts them in the late afternoon), and **SPIKE**
+warnings — red hours in the strip, a banner naming the spike window, and a flashing ⚡ pill in the
+header when a spike is on or within three hours. Set the threshold in the wizard's Weather step. The
+price also goes out through `/api/state` for Home Assistant automations. Delivery charges are fixed
+and not shown; this is the part you can plan around.
 
 ## Home Assistant, Home-IO and other hubs
 Both directions:

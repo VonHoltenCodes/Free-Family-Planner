@@ -30,6 +30,30 @@ def _db_load():
     except (OSError, ValueError): db = {}
     db.setdefault('rev', 0); db.setdefault('data', {}); return db
 
+_power_cache = {'t': 0, 'data': None}
+def comed_prices():
+    """ComEd Hourly Pricing: current-hour average + 5-min price (documented API) and today's/tomorrow's
+    day-ahead hourly prices (the undocumented ServletFeed the ComEd site itself uses). ¢/kWh, Central time."""
+    import time, datetime as dt
+    try: from zoneinfo import ZoneInfo; now = dt.datetime.now(ZoneInfo('America/Chicago'))
+    except Exception: now = dt.datetime.now()  # noqa: BLE001
+    if _power_cache['data'] and time.time() - _power_cache['t'] < 300: return _power_cache['data']
+    def get(url):
+        with urllib.request.urlopen(urllib.request.Request(url, headers={'User-Agent': 'FreeFamilyPlanner/1.0'}), timeout=15) as r: return r.read().decode()
+    def day(d):
+        raw = get(f'https://hourlypricing.comed.com/rrtp/ServletFeed?type=daynexttoday&date={d:%Y%m%d}')
+        return [{'hour': int(m.group(4)), 'price': float(m.group(5))} for m in re.finditer(r'Date\.UTC\((\d+),(\d+),(\d+),(\d+),0,0\),\s*([\d.]+)', raw)]
+    out = {'provider': 'comed', 'units': '¢/kWh', 'updatedAt': now.isoformat(), 'hour': now.hour, 'current': None, 'fiveMin': None, 'today': [], 'tomorrow': []}
+    try: out['current'] = float(json.loads(get('https://hourlypricing.comed.com/api?type=currenthouraverage'))[0]['price'])
+    except Exception as e: out['error'] = f'current: {e}'  # noqa: BLE001
+    try: out['fiveMin'] = float(json.loads(get('https://hourlypricing.comed.com/api?type=5minutefeed'))[0]['price'])
+    except Exception: pass  # noqa: BLE001
+    try: out['today'] = day(now.date())
+    except Exception as e: out['error'] = f'day-ahead: {e}'  # noqa: BLE001
+    try: out['tomorrow'] = day(now.date() + dt.timedelta(days=1))
+    except Exception: out['tomorrow'] = []  # noqa: BLE001
+    _power_cache.update(t=time.time(), data=out); return out
+
 FULL_DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 
 def derive_state(db):
@@ -160,9 +184,12 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         if self.path.startswith('/api/ics.php'): return self._ics_proxy()
         if self.path.split('?')[0] in ('/api/state', '/api/state.php'): return self._state()
         if self.path.startswith('/api/hub.php'): return self._hub()
+        if self.path.split('?')[0] in ('/api/power', '/api/power.php'):
+            try: return self._json(200, comed_prices())
+            except Exception as e: return self._json(502, {'error': str(e)})  # noqa: BLE001
         if self.path in ('/', '/index.php', '/index.html'):
             self.path = '/app.html'
-        if self.path.startswith('/includes/') or (self.path.startswith('/api/') and not self.path.split('?')[0] in ('/api/state', '/api/state.php')):
+        if self.path.startswith('/includes/') or (self.path.startswith('/api/') and not self.path.split('?')[0] in ('/api/state', '/api/state.php', '/api/power', '/api/power.php')):
             self.send_error(403); return
         return super().do_GET()
     def do_POST(self):
@@ -173,7 +200,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         try:
             n = int(self.headers.get('Content-Length', '0')); cfg = json.loads(self.rfile.read(n) or b'{}')
             if not isinstance(cfg, dict) or 'family' not in cfg or 'location' not in cfg: raise ValueError('invalid config')
-            clean = {k: cfg[k] for k in ('family', 'location', 'firebase', 'googleClientId', 'holidayCalendarId', 'backend', 'calendars', 'weather', 'house', 'defaultMode') if k in cfg}
+            clean = {k: cfg[k] for k in ('family', 'location', 'firebase', 'googleClientId', 'holidayCalendarId', 'backend', 'calendars', 'weather', 'house', 'defaultMode', 'defaultTab', 'power') if k in cfg}
             target = os.path.join(ROOT, 'config.js')
             if os.path.exists(target): shutil.copy(target, target + '.bak')
             with open(target, 'w') as f:

@@ -11,7 +11,8 @@ export const DEFAULTS = {
   calendars: [{ type: 'local', name: 'Family', color: '#2bff66' }],
   weather: { provider: 'auto', screens: {}, speed: 1, scanLines: false },
   house: { tiles: [] },
-  defaultMode: 'both',   // 'family' | 'command' | 'both' — what a new display shows (each display can override in ☰ Display)   // home-hub tiles: [{ entity, label, kind? }] — the hub URL/token live server-side, never here
+  power: { provider: 'none', warnAbove: 8 },   // 'comed' = ComEd Hourly Pricing panel + spike warnings (¢/kWh)
+  defaultTab: 'family',  // 'family' | 'command' — the tab a display starts on (both tabs are always available)   // home-hub tiles: [{ entity, label, kind? }] — the hub URL/token live server-side, never here
 };
 export const LS_KEY = 'fp.config';
 
@@ -30,7 +31,7 @@ export function deepMerge(base, ...layers) {
 
 export async function loadConfig() {
   let file = {}; let source = 'defaults';
-  try { file = (await import('../../config.js')).default || {}; source = 'config.js'; }
+  try { file = (await import(`../../config.js?_=${Math.floor(Date.now() / 60000)}`)).default || {}; source = 'config.js'; }
   catch (e) { console.warn('config.js not loaded (run the ⚙ setup wizard):', e.message); }
   let local = {};
   try { local = JSON.parse(localStorage.getItem(LS_KEY) || 'null') || {}; if (Object.keys(local).length) source += '+localStorage'; } catch { /* ignore */ }

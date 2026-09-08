@@ -55,8 +55,8 @@ export function openSetup(current, { firstRun = false } = {}) {
     const f = draft.family;
     if (step === 0) {
       body.appendChild(el('p', 'lead', firstRun ? 'Welcome! A few questions and the wall display is yours. Nothing here leaves your own setup. Not a family planner person? Skip kids and meals, hide any panel later in ☰ Display, and use it as a home dashboard.' : 'Names shown in the header and the status bar.'));
-      body.appendChild(opt2('Start as', [['family', 'Family planner'], ['command', 'Home central command'], ['both', 'Both (tabs)']], draft.defaultMode || 'both', (v) => { draft.defaultMode = v; }));
-      body.appendChild(el('small', 'hint', 'Family planner = calendar, lists, meals, chores, weather. Home central command = house controls from your hub, weather, calendar. Both = a FAMILY / COMMAND tab switch in the header. Every display can override this in ☰ Display.'));
+      body.appendChild(opt2('Default tab', [['family', 'Family planner'], ['command', 'Home command']], draft.defaultTab || (draft.defaultMode === 'command' ? 'command' : 'family'), (v) => { draft.defaultTab = v; }));
+      body.appendChild(el('small', 'hint', 'FAMILY = calendar, lists, meals, chores, weather. COMMAND = house controls from your hub plus the calendar. Both tabs are always in the status bar; this is just where a display starts.'));
       body.appendChild(field('Family title', text(f.title, 'OUR FAMILY', (v) => { f.title = v; })));
       body.appendChild(field('Subtitle', text(f.subtitle, 'CENTRAL COMMAND', (v) => { f.subtitle = v; })));
       body.appendChild(field('Status bar text', text((f.footer || []).join(' • '), 'FAMILY COMMAND CENTER • EST. 2025 • YOUR TOWN, ST', (v) => { f.footer = v.split('•').map((s) => s.trim()).filter(Boolean); }), 'separate items with •'));
@@ -167,6 +167,11 @@ export function openSetup(current, { firstRun = false } = {}) {
       const grid = el('div', 'kv screens'); WS_SCREENS.forEach(([id, name, on]) => { const chk = el('button', 'chk' + ((wx.screens[id] ?? on) ? ' on' : '')); chk.type = 'button'; chk.addEventListener('click', () => { const cur = wx.screens[id] ?? on; wx.screens[id] = !cur; chk.classList.toggle('on', !cur); }); grid.append(chk, el('span', 'pname', name)); }); body.appendChild(grid);
       body.appendChild(opt2('Speed', [[0.5, 'Slow'], [0.75, '¾'], [1, 'Normal'], [1.5, 'Fast'], [2, 'Fastest']], wx.speed, (v) => { wx.speed = v; }));
       body.appendChild(opt2('Scan lines', [[false, 'Off'], [true, 'CRT look']], wx.scanLines, (v) => { wx.scanLines = v; }));
+      body.appendChild(el('div', 'sect', 'Electricity pricing'));
+      const pw = draft.power = { provider: 'none', warnAbove: 8, ...(draft.power || {}) };
+      body.appendChild(opt2('Provider', [['none', 'None'], ['comed', 'ComEd Hourly Pricing (IL)']], pw.provider, (v) => { pw.provider = v; }));
+      body.appendChild(field('Warn at or above (¢/kWh)', text(String(pw.warnAbove), '8', (v) => { pw.warnAbove = Number(v) || 8; }), 'Panel shows the live price and the day-ahead hours; hours at or above this turn red with a SPIKE warning in the header. Delivery charges are on top and fixed, so this is the part you can plan around.'));
+      body.appendChild(testBtn('Test ComEd feed', async () => { const r = await fetch('api/power.php', { cache: 'no-store' }); const d = await r.json(); if (!r.ok || d.current == null) throw new Error(d.error || `HTTP ${r.status}`); return `now ${d.current}¢/kWh · ${d.today.length} day-ahead hours today${d.tomorrow.length ? ', tomorrow posted' : ''}`; }));
     } else if (step === 6) {
       const hs = draft.house = { tiles: [], ...(draft.house || {}) }; let hubCfg = { type: 'none', url: '', todoEntity: 'todo.shopping_list', hasToken: false }; let entities = null;
       body.appendChild(el('p', 'lead', 'Optional: connect a home hub. The House panel shows the tiles you pick, and the shopping list can sync with the hub\'s to-do list (voice assistants feed it). The hub address and token are stored on the server, never in the page.'));

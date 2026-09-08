@@ -7,7 +7,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <title>Family Planner</title>
 <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="assets/css/planner.css?v=20">
+<link rel="stylesheet" href="assets/css/planner.css?v=21">
 </head>
 <body>
 <div class="scaler">
@@ -20,6 +20,7 @@
     <div class="title" id="hdr-title">FAMILY<small id="hdr-subtitle">PLANNER</small></div>
     <div class="flourish"></div>
     <div class="spacer"></div>
+    <div class="hdr-alert" id="hdr-alert" hidden role="status"></div>
     <div class="date" id="hdr-date">—</div>
     <div class="lcdbox" role="status" aria-label="Outside temperature"><span class="lab" aria-hidden="true">OUTSIDE</span><span class="lcd temp"><span class="ghost" aria-hidden="true">888</span><span id="hdr-temp">--</span><span class="unit">°F</span></span><span class="wxword" id="hdr-cond"></span></div>
     <div class="lcdbox" role="status" aria-label="Clock"><span class="lab" aria-hidden="true">TIME</span><span class="lcd clock"><span class="ghost" aria-hidden="true">88:88</span><span id="hdr-clock">--:--</span><span class="ampm" id="hdr-ampm"></span></span></div>
@@ -84,6 +85,10 @@
         <div class="tbar"><span class="tag"></span><h2>Chores</h2></div>
         <div class="body"><div class="kids" id="kids"></div></div>
       </section>
+      <section class="panel" id="p-power" role="region" aria-label="Electricity" hidden>
+        <div class="tbar"><span class="tag gold"></span><h2>Electricity</h2><span class="grow"></span><span class="sub" id="power-sub">ComEd hourly</span></div>
+        <div class="body"><div class="power" id="power"></div></div>
+      </section>
       <section class="panel" id="p-house" role="region" aria-label="House" hidden>
         <div class="tbar"><span class="tag gold"></span><h2>House</h2><span class="grow"></span><span class="sub" id="house-sub"></span></div>
         <div class="body"><div class="tiles" id="house-tiles"></div></div>
@@ -136,6 +141,6 @@
 </div>
 </div>
 
-<script type="module" src="assets/js/planner.js?v=19"></script>
+<script type="module" src="assets/js/planner.js?v=20"></script>
 </body>
 </html>

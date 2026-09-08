@@ -14,15 +14,16 @@ export const PANELS = {
   chores: { id: 'p-chores', name: 'Chores',            width: 'half', h: '236px', side: 'left' },
   notes:  { id: 'p-notes',  name: 'Notes',             width: 'half', h: '236px', side: 'right' },
   house:  { id: 'p-house',  name: 'House (home hub)',  width: 'half', h: '236px', side: 'left', wideH: '1fr' },
+  power:  { id: 'p-power',  name: 'Electricity (ComEd)', width: 'half', h: '236px', side: 'right', wideH: '360px' },
 };
 export const SCREENS = { family: 'Family', command: 'Command' };
-const unavailable = new Set(['house']);
+const unavailable = new Set(['house', 'power']);
 export function setPanelAvailable(key, ok) { if (ok) unavailable.delete(key); else unavailable.add(key); }
 
 const DEFAULT_SCREENS = {
-  family:  { order: ['cal', 'wx', 'shop', 'week', 'meals', 'chores', 'notes', 'house'], hidden: [], wide: [] },
+  family:  { order: ['cal', 'wx', 'shop', 'week', 'meals', 'chores', 'notes', 'power', 'house'], hidden: [], wide: [] },
   // Command = the house: controls first; weather, lists, meals, chores and notes live on the Family tab
-  command: { v: 2, order: ['house', 'cal', 'week', 'wx', 'notes', 'shop', 'meals', 'chores'], hidden: ['wx', 'notes', 'shop', 'meals', 'chores'], wide: ['house'] },
+  command: { v: 3, order: ['house', 'power', 'cal', 'week', 'wx', 'notes', 'shop', 'meals', 'chores'], hidden: ['wx', 'notes', 'shop', 'meals', 'chores'], wide: ['house'] },
 };
 export const DEFAULT_DISPLAY = {
   mode: null,            // 'family' | 'command' | 'both' — null = follow config.defaultMode
@@ -44,11 +45,13 @@ export function loadDisplay() {
   Object.values(d.screens).forEach((s) => { s.order = [...s.order.filter((k) => PANELS[k]), ...Object.keys(PANELS).filter((k) => !s.order.includes(k))]; s.hidden = s.hidden.filter((k) => PANELS[k]); s.wide = (s.wide || []).filter((k) => PANELS[k]); });
   delete d.order; delete d.hidden;
   if (!SCREENS[d.active]) d.active = 'family';
+  if (!saved.active) d.active = null;   // resolved from config.defaultTab at boot
   return d;
 }
 export const saveDisplay = (d) => localStorage.setItem(LS, JSON.stringify(d));
-export const effectiveMode = (d, config) => d.mode || config?.defaultMode || 'both';
-export function currentScreen(d, config) { const m = effectiveMode(d, config); return m === 'both' ? d.active : m; }
+export const effectiveMode = () => 'both';   // tabs are always shown; the default tab comes from config.defaultTab
+export function currentScreen(d) { return SCREENS[d.active] ? d.active : 'family'; }
+export function defaultTab(config) { const t = config?.defaultTab || config?.defaultMode; return SCREENS[t] ? t : 'family'; }
 
 /* ---------- layout engine ---------- */
 const px = (h) => (h === '1fr' ? 0 : parseInt(h, 10));
@@ -143,12 +146,11 @@ export function openDisplaySettings(d, config, onChange) {
     wrap.appendChild(grp); return wrap; };
 
   body.appendChild(el('p', 'lead', 'These settings live on this display only (saved in this browser). Each screen in the house can be arranged differently.'));
-  body.appendChild(el('div', 'sect', 'Screens'));
-  const mode = effectiveMode(d, config);
-  body.appendChild(opt('Show', [['family', 'Family planner'], ['command', 'Home command'], ['both', 'Both (tabs)']], mode, (v) => { d.mode = v; if (v !== 'both') d.active = v; }));
-  body.appendChild(opt('Auto-switch tabs', [[0, 'Off'], [2, '2 min'], [5, '5 min'], [10, '10 min']], d.rotateMinutes, (v) => { d.rotateMinutes = v; }));
+  body.appendChild(el('div', 'sect', 'Screens — FAMILY / COMMAND tabs are in the status bar; pick the default tab in ⚙ Setup'));
+  body.appendChild(opt('Auto-switch tabs', [[0, 'Off'], [5, '5 min'], [10, '10 min'], [30, '30 min']], d.rotateMinutes, (v) => { d.rotateMinutes = v; }));
+  body.appendChild(el('small', 'hint', 'Auto-switch never fires within two minutes of a touch, while typing, or while a dialog is open.'));
   // per-screen panel editor
-  let editing = currentScreen(d, config);
+  let editing = currentScreen(d);
   body.appendChild(el('div', 'sect', 'Panels — show / hide, order, and width, per screen'));
   const pick = el('div', 'seg'); const list = el('div', 'panel-list');
   const drawPick = () => { pick.innerHTML = ''; Object.entries(SCREENS).forEach(([k, name]) => { const b = el('button', 'btn sm' + (k === editing ? ' on' : ''), `${name} screen`); b.type = 'button'; b.addEventListener('click', () => { editing = k; drawPick(); draw(); }); pick.appendChild(b); }); };
