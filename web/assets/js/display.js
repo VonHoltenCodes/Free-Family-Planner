@@ -21,7 +21,8 @@ export function setPanelAvailable(key, ok) { if (ok) unavailable.delete(key); el
 
 const DEFAULT_SCREENS = {
   family:  { order: ['cal', 'wx', 'shop', 'week', 'meals', 'chores', 'notes', 'house'], hidden: [], wide: [] },
-  command: { order: ['house', 'wx', 'notes', 'cal', 'week', 'shop', 'meals', 'chores'], hidden: ['shop', 'meals', 'chores'], wide: ['house'] },
+  // Command = the house: controls first; weather, lists, meals, chores and notes live on the Family tab
+  command: { v: 2, order: ['house', 'cal', 'week', 'wx', 'notes', 'shop', 'meals', 'chores'], hidden: ['wx', 'notes', 'shop', 'meals', 'chores'], wide: ['house'] },
 };
 export const DEFAULT_DISPLAY = {
   mode: null,            // 'family' | 'command' | 'both' — null = follow config.defaultMode
@@ -39,7 +40,7 @@ export function loadDisplay() {
   const d = { ...structuredClone(DEFAULT_DISPLAY), ...saved, dim: { ...DEFAULT_DISPLAY.dim, ...(saved.dim || {}) }, screens: structuredClone(DEFAULT_SCREENS) };
   // migrate v1 (single order/hidden) into the family screen
   if (saved.order && !saved.screens) { d.screens.family.order = saved.order; d.screens.family.hidden = saved.hidden || []; }
-  if (saved.screens) Object.keys(DEFAULT_SCREENS).forEach((k) => { if (saved.screens[k]) d.screens[k] = { ...DEFAULT_SCREENS[k], ...saved.screens[k] }; });
+  if (saved.screens) Object.keys(DEFAULT_SCREENS).forEach((k) => { if (saved.screens[k] && (saved.screens[k].v || 0) >= (DEFAULT_SCREENS[k].v || 0)) d.screens[k] = { ...DEFAULT_SCREENS[k], ...saved.screens[k] }; });
   Object.values(d.screens).forEach((s) => { s.order = [...s.order.filter((k) => PANELS[k]), ...Object.keys(PANELS).filter((k) => !s.order.includes(k))]; s.hidden = s.hidden.filter((k) => PANELS[k]); s.wide = (s.wide || []).filter((k) => PANELS[k]); });
   delete d.order; delete d.hidden;
   if (!SCREENS[d.active]) d.active = 'family';

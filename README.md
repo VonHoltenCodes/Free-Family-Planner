@@ -111,7 +111,7 @@ Firestore, NWS and WeatherStar work locally; Google sign-in only works on an aut
 
 ## Two faces: Family Planner and Home Central Command
 The same display can be a **family planner** (calendar, lists, meals, chores, weather), a **home
-central command** (a big House panel of tappable controls from your hub, weather, calendar), or
+central command** (a big House panel of tappable controls from your hub, plus the calendar), or
 **both** with a FAMILY / COMMAND tab switch in the header and optional auto-rotation. Pick the
 starting point in the wizard; every screen can override it in ☰ Display, where each face has its
 own panel order, hidden panels, and which panels go full width.
