@@ -51,7 +51,8 @@ function keyboardGuard() {
   if (!isField(field) || h >= baseViewport.h * 0.9 || w !== baseViewport.w) { c.classList.remove('kbd'); return false; }
   const r = field.getBoundingClientRect(); const visibleBottom = h - 16;
   const shift = r.bottom > visibleBottom ? visibleBottom - r.bottom - 8 : 0;
-  c.classList.add('kbd'); c.style.transform = `translateY(${shift}px) scale(${baseViewport.scale})`;
+  const [ox, oy] = (c.dataset.offset || '0,0').split(',').map(Number);
+  c.classList.add('kbd'); c.style.transform = `translate(${ox}px, ${oy + shift}px) scale(${baseViewport.scale})`;
   return true;
 }
 function viewport() {
@@ -66,7 +67,9 @@ function fitCanvas() {
   if (portrait !== lastPortrait) { lastPortrait = portrait; applyLayout(display, portrait, currentScreen(display)); renderTabs(); }
   const [w, h] = portrait ? [1080, 1920] : [1920, 1080];
   const s = Math.min(v.w / w, v.h / h);
-  c.style.transform = `scale(${s})`;
+  const ox = Math.round((v.w - w * s) / 2); const oy = Math.round((v.h - h * s) / 2);
+  c.style.transform = `translate(${ox}px, ${oy}px) scale(${s})`;
+  c.dataset.offset = `${ox},${oy}`;
   // size and place the scaler to the *visible* viewport (handles pinch-zoom, URL bars, side nav bars)
   const sc = document.querySelector('.scaler'); sc.style.left = `${v.x}px`; sc.style.top = `${v.y}px`; sc.style.width = `${v.w}px`; sc.style.height = `${v.h}px`;
   baseViewport = { w: v.w, h: v.h, scale: s };
