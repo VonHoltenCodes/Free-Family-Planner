@@ -15,6 +15,12 @@ define('FP_PASSWORD_HASH', '$2y$10$REPLACE_WITH_OUTPUT_OF_password_hash');
 define('FP_SESSION_NAME', 'fp_session');
 define('FP_SESSION_LIFETIME', 7 * 24 * 60 * 60);   // seconds; 7 days keeps the wall display signed in
 
+// Optional: lets a home hub (Home Assistant REST sensor) read api/state.php without a login:
+//   http://…/family-planner/api/state.php?token=<this value>   (leave empty to disable)
+define('FP_STATE_TOKEN', '');
+// Optional: the family's timezone for "today" in the api/state.php fallback (PHP timezone name)
+define('FP_TIMEZONE', 'America/Chicago');
+
 // Optional branding for the sign-in page (the app itself reads config.js)
 define('FP_TITLE', 'OUR FAMILY');
 define('FP_SUBTITLE', 'CENTRAL COMMAND');
