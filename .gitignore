@@ -10,3 +10,5 @@ web/includes/data/
 # local scratch
 reference/
 *.log
+__pycache__/
+*.pyc
