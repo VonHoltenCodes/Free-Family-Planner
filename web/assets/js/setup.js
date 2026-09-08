@@ -13,10 +13,10 @@ const slug = (s) => (s || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(
 const STEPS = ['Family', 'Kids', 'Location', 'Data', 'Calendars', 'Weather', 'Home hub', 'Save'];
 const KID_COLORS = ['#ff69b4', '#4169e1', '#2bff66', '#ffd11a', '#ff9f5b', '#c98bdb', '#2bd0ff', '#ff3b2e'];
 
-export function openSetup(current, { firstRun = false } = {}) {
+export function openSetup(current, { firstRun = false, step: startStep = 0 } = {}) {
   if (document.getElementById('setup-overlay')) return;
   const draft = deepMerge(DEFAULTS, current); delete draft.__source; delete draft.__hasFile;
-  let step = 0;
+  let step = Math.min(Math.max(0, startStep), STEPS.length - 1);
 
   const overlay = el('div', 'overlay'); overlay.id = 'setup-overlay';
   const dlg = el('div', 'dlg setup');

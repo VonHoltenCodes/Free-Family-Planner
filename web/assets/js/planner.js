@@ -34,7 +34,7 @@ $('hdr-subtitle').textContent = config.family.subtitle;
 $('wx-place').textContent = config.location.label || '';
 stateSet('family', { title: config.family.title, subtitle: config.family.subtitle, location: config.location.label || '' });
 $('btn-setup').addEventListener('click', () => openSetup(config));
-$('btn-display').addEventListener('click', () => openDisplaySettings(display, config, () => { if (display.choresPerKid !== CHORES_PER_KID) { location.reload(); return; } lastPortrait = null; fitCanvas(); tickClock(); if (config.location.lat != null) refreshWx(); if (typeof renderAll === 'function') renderAll(); dimTick(); }));
+$('btn-display').addEventListener('click', () => openDisplaySettings(display, config, () => { if (display.choresPerKid !== CHORES_PER_KID) { location.reload(); return; } lastPortrait = null; fitCanvas(); tickClock(); if (config.location.lat != null) refreshWx(); if (typeof renderAll === 'function') renderAll(); dimTick(); }, { openTiles: () => openSetup(config, { step: 6 }) }));
 const dimTick = startDim(display);
 if (!isConfigured(config)) setTimeout(() => openSetup(config, { firstRun: true }), 600);
 { const f = $('status-footer'); f.innerHTML = ''; (config.family.footer || []).forEach((t, i) => { if (i) f.appendChild(el('span', 'sep', '•')); f.appendChild(el('span', null, t)); }); }

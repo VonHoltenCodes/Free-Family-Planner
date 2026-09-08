@@ -134,7 +134,7 @@ export function applyTheme(d) {
 }
 
 /* ---------- settings dialog ---------- */
-export function openDisplaySettings(d, config, onChange) {
+export function openDisplaySettings(d, config, onChange, { openTiles } = {}) {
   if (document.getElementById('display-overlay')) return;
   const overlay = el('div', 'overlay'); overlay.id = 'display-overlay';
   const dlg = el('div', 'dlg setup display');
@@ -153,7 +153,7 @@ export function openDisplaySettings(d, config, onChange) {
   body.appendChild(el('small', 'hint', 'Auto-switch never fires within two minutes of a touch, while typing, or while a dialog is open.'));
   // per-screen panel editor
   let editing = currentScreen(d);
-  body.appendChild(el('div', 'sect', 'Panels — show / hide, order, and width, per screen'));
+  body.appendChild(el('div', 'sect', 'Panels — show / hide, order, and width, per screen (devices and tiles are picked in ⚙ Setup → Home hub)'));
   const pick = el('div', 'seg'); const list = el('div', 'panel-list');
   const drawPick = () => { pick.innerHTML = ''; Object.entries(SCREENS).forEach(([k, name]) => { const b = el('button', 'btn sm' + (k === editing ? ' on' : ''), `${name} screen`); b.type = 'button'; b.addEventListener('click', () => { editing = k; drawPick(); draw(); }); pick.appendChild(b); }); };
   const draw = () => { const sc = d.screens[editing]; list.innerHTML = ''; sc.order.forEach((k, i) => {
@@ -164,7 +164,8 @@ export function openDisplaySettings(d, config, onChange) {
     wideB.addEventListener('click', () => { sc.wide = sc.wide.includes(k) ? sc.wide.filter((w) => w !== k) : [...sc.wide, k]; draw(); commit(); });
     const up = el('button', 'btn sm', '▲'); up.type = 'button'; up.disabled = i === 0; up.addEventListener('click', () => { [sc.order[i - 1], sc.order[i]] = [sc.order[i], sc.order[i - 1]]; draw(); commit(); });
     const dn = el('button', 'btn sm', '▼'); dn.type = 'button'; dn.disabled = i === sc.order.length - 1; dn.addEventListener('click', () => { [sc.order[i + 1], sc.order[i]] = [sc.order[i], sc.order[i + 1]]; draw(); commit(); });
-    row.append(chk, el('span', 'pname', PANELS[k].name), el('span', 'grow'), wideB, up, dn); list.appendChild(row); }); };
+    if (k === 'house' && openTiles) { const tb = el('button', 'btn sm', 'Tiles…'); tb.type = 'button'; tb.title = 'Choose which devices show as tiles (⚙ Setup → Home hub)'; tb.addEventListener('click', () => { overlay.remove(); openTiles(); }); row.append(chk, el('span', 'pname', PANELS[k].name), tb, el('span', 'grow'), wideB, up, dn); }
+    else row.append(chk, el('span', 'pname', PANELS[k].name), el('span', 'grow'), wideB, up, dn); list.appendChild(row); }); };
   drawPick(); draw(); body.append(pick, list);
   body.appendChild(el('div', 'sect', 'Theme'));
   body.appendChild(opt('Theme', THEMES, d.theme, (v) => { d.theme = v; applyTheme(d); }));
