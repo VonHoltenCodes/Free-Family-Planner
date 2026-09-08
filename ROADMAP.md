@@ -1,7 +1,15 @@
 # Roadmap
 
-The first roadmap is complete (everything below is merged). New ideas go in Issues; each feature
+The first roadmap is complete (everything marked ✅ is merged). New ideas go in Issues; each feature
 still gets a `feat/<name>` branch and a PR.
+
+## Next up
+
+| Feature | Branch | What it means |
+|---|---|---|
+| **Desktop app (Windows / macOS)** | `feat/desktop-app` | Serve the planner from a home PC with no Docker or terminal: a tray / menu-bar app bundling `serve.py` + Python, shows the LAN address and a QR code, autostarts at login, optional "show it on this PC" window. Signed installers via the existing Azure Trusted Signing (Windows) and Developer ID + notarization (macOS) pipelines. Issue #17. |
+
+## Shipped in v0.1.0
 
 | Feature | Branch | What it means |
 |---|---|---|
