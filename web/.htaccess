@@ -26,6 +26,9 @@
 <Files "config.js">
     Header set Cache-Control "no-store"
 </Files>
+<FilesMatch "\.(js|css)$">
+    Header set Cache-Control "no-cache"
+</FilesMatch>
 
 <IfModule mod_headers.c>
     # The site root sets X-Frame-Options DENY with "Header always"; that blocks the WeatherStar
@@ -41,8 +44,11 @@
 
 <IfModule mod_expires.c>
     ExpiresActive On
-    ExpiresByType text/css "access plus 1 week"
-    ExpiresByType application/javascript "access plus 1 week"
+    # scripts and styles revalidate on every load (the wall display must never run mixed versions);
+    # they are small and the server answers 304 when unchanged
+    ExpiresByType text/css "access plus 0 seconds"
+    ExpiresByType application/javascript "access plus 0 seconds"
+    ExpiresByType text/javascript "access plus 0 seconds"
     ExpiresByType image/png "access plus 1 month"
     ExpiresByType image/x-icon "access plus 1 month"
     ExpiresByType image/svg+xml "access plus 1 month"
