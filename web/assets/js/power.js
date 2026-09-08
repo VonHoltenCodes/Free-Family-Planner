@@ -21,7 +21,7 @@ export function mountPower(host, cfg, { onStatus, onAlert, publish } = {}) {
       const upcoming = [...d.today.filter((x) => x.hour >= d.hour).map((x) => ({ ...x, day: 'today' })), ...d.tomorrow.map((x) => ({ ...x, day: 'tomorrow' }))].slice(0, 30);
       strip.innerHTML = ''; const max = Math.max(warn, ...upcoming.map((x) => x.price), 1);
       upcoming.forEach((x) => { const b = el('div', `pw-bar ${level(x.price)}${x.day === 'today' && x.hour === d.hour ? ' now' : ''}`); b.title = `${x.day} ${hh(x.hour)}: ${x.price}¢`;
-        const fill = el('div', 'pw-fill'); fill.style.height = `${Math.max(6, Math.round((x.price / max) * 100))}%`; b.append(fill, el('span', 'pw-h', hh(x.hour))); strip.appendChild(b); });
+        const fill = el('div', 'pw-fill'); fill.style.height = `${Math.max(10, Math.round((x.price / max) * 100))}%`; b.append(fill, el('span', 'pw-h', hh(x.hour))); strip.appendChild(b); });
       const spikes = upcoming.filter((x) => x.price >= warn && !(x.day === 'today' && x.hour === d.hour));
       const soon = spikes.filter((x) => x.day === 'today' && x.hour - d.hour <= 3);
       if (lv === 'spike' || spikes.length) {
