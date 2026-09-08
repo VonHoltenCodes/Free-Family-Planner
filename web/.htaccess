@@ -12,7 +12,7 @@
     RewriteRule ^api/v1/?(.*)$ api/v1.php?path=$1 [L,QSA]
 
     # Static assets and the bundled WeatherStar 4000+ build are served directly
-    RewriteRule ^(assets|ws4kp)/ - [L]
+    RewriteRule ^(assets|ws4kp|demo)/ - [L]
 
     # Serve index.php for all other requests (SPA routing)
     RewriteCond %{REQUEST_FILENAME} !-f
@@ -29,6 +29,10 @@
 <Files "config.js">
     Header set Cache-Control "no-store"
 </Files>
+<FilesMatch "\.ics$">
+    Header set Content-Type "text/calendar; charset=utf-8"
+    Header set Access-Control-Allow-Origin "*"
+</FilesMatch>
 <FilesMatch "\.(js|css)$">
     Header set Cache-Control "no-cache"
 </FilesMatch>

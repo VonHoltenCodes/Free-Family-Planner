@@ -10,7 +10,7 @@ import { loadScript } from './gcal.js';
 
 const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
 const slug = (s) => (s || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || `kid-${Date.now()}`;
-const STEPS = ['Family', 'Kids', 'Location', 'Data', 'Calendars', 'Weather', 'Home hub', 'Save'];
+const STEPS = ['Family', 'Kids', 'Location', 'Data', 'Calendars', 'Weather', 'Home hub', 'Access', 'Save'];
 const KID_COLORS = ['#ff69b4', '#4169e1', '#2bff66', '#ffd11a', '#ff9f5b', '#c98bdb', '#2bd0ff', '#ff3b2e'];
 
 export function openSetup(current, { firstRun = false, step: startStep = 0 } = {}) {
@@ -201,6 +201,33 @@ export function openSetup(current, { firstRun = false, step: startStep = 0 } = {
       hub.status().then((s) => { hubCfg = { ...hubCfg, ...s }; urlI.value = s.url || ''; todoI.value = s.todoEntity || 'todo.shopping_list'; typeRow.querySelectorAll('.btn').forEach((b) => b.classList.toggle('on', b.textContent === ({ none: 'None', homeassistant: 'Home Assistant', homeio: 'Home-IO' })[s.type])); if (s.type !== 'none') { hub.entities().then((e) => { entities = e; drawEnts(); }).catch(() => {}); } paintHub(); }).catch(() => { hubBox.hidden = true; typeRow.hidden = true; body.appendChild(el('div', 'hint', 'No hub endpoint on this host (static hosting) — the House panel needs the local server or the PHP install.')); });
       paintHub(); drawEnts();
     } else if (step === 7) {
+      body.appendChild(el('p', 'lead', 'Who can open the page, and tokens for scripts and hubs. These are saved on the server immediately (not with the Save step).'));
+      const box = el('div'); body.appendChild(box);
+      const api = async (m, b) => { const r = await fetch('api/v1/access', { method: m, headers: { 'Content-Type': 'application/json' }, body: b ? JSON.stringify(b) : undefined, cache: 'no-store' }); const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || `HTTP ${r.status}`); return j; };
+      api('GET').then((a) => {
+        if (a.mode === 'hosted') {
+          box.appendChild(el('div', 'sect', 'Sign-in for this page'));
+          const u = text(a.username || '', 'username', () => {}); const p1 = el('input'); p1.type = 'password'; p1.placeholder = 'new password (8+ characters, blank = keep)'; p1.autocomplete = 'new-password'; const p2 = el('input'); p2.type = 'password'; p2.placeholder = 'new password again'; p2.autocomplete = 'new-password';
+          box.append(field('Username', u), field('Password', p1), field('Password again', p2));
+          const save = el('button', 'btn sm', 'Save login'); save.type = 'button'; const so = el('span', 'test-out'); const row = el('div', 'test-row'); row.append(save, so); box.appendChild(row);
+          save.addEventListener('click', async () => { if (p1.value && p1.value !== p2.value) { so.className = 'test-out bad'; so.textContent = '✗ passwords do not match'; return; } try { const b = { username: u.value.trim() }; if (p1.value) b.password = p1.value; await api('PATCH', b); so.className = 'test-out ok'; so.textContent = '✓ saved — you stay signed in on this screen; other screens sign in again with the new details'; p1.value = ''; p2.value = ''; } catch (e) { so.className = 'test-out bad'; so.textContent = `✗ ${e.message}`; } });
+          box.appendChild(el('small', 'hint', `Sign-in lasts ${a.sessionDays} days per screen. The password hash lives in includes/auth_config.php, which the web server never serves.`));
+        } else {
+          box.appendChild(el('div', 'sect', 'Sign-in'));
+          box.appendChild(el('small', 'hint', 'This is a local-host install: there is no login page — anyone on your LAN can open it, and the wizard, ☰ Display and the API are open too. Use the hosted (PHP) install if you need a password on the page. Do not port-forward this server to the internet.'));
+        }
+        box.appendChild(el('div', 'sect', 'API token — for tools/ffp, scripts and agents'));
+        const tokOut = el('div', 'preview'); tokOut.hidden = true; const tokRow = el('div', 'test-row'); const gen = el('button', 'btn sm', a.hasApiToken ? 'Generate a new token' : 'Generate token'); gen.type = 'button'; const clr = el('button', 'btn sm danger', 'Remove token'); clr.type = 'button'; clr.hidden = !a.hasApiToken; const to = el('span', 'test-out', a.hasApiToken ? 'a token is set (not shown)' : (a.mode === 'hosted' ? 'no token: the API needs the site login' : 'no token: the API is open on the LAN'));
+        tokRow.append(gen, clr, to); box.append(tokRow, tokOut);
+        gen.addEventListener('click', async () => { try { const r = await api('PATCH', { apiToken: 'generate' }); tokOut.hidden = false; tokOut.textContent = `${r.apiToken}\n\nCopy it now — it is not shown again.\nffp --url ${location.origin}${location.pathname.replace(/\/[^/]*$/, '')} --token ${r.apiToken} save-config`; to.className = 'test-out ok'; to.textContent = '✓ token set'; clr.hidden = false; gen.textContent = 'Generate a new token'; } catch (e) { to.className = 'test-out bad'; to.textContent = `✗ ${e.message}`; } });
+        clr.addEventListener('click', async () => { try { await api('PATCH', { apiToken: null }); tokOut.hidden = true; to.className = 'test-out'; to.textContent = 'token removed'; clr.hidden = true; gen.textContent = 'Generate token'; } catch (e) { to.className = 'test-out bad'; to.textContent = `✗ ${e.message}`; } });
+        if (a.mode === 'hosted') {
+          box.appendChild(el('div', 'sect', 'Hub read token — lets Home Assistant read api/state.php without a login'));
+          const sRow = el('div', 'test-row'); const sGen = el('button', 'btn sm', a.hasStateToken ? 'Generate a new read token' : 'Generate read token'); sGen.type = 'button'; const sOut = el('span', 'test-out', a.hasStateToken ? 'a read token is set (not shown)' : 'none'); const sPre = el('div', 'preview'); sPre.hidden = true; sRow.append(sGen, sOut); box.append(sRow, sPre);
+          sGen.addEventListener('click', async () => { try { const r = await api('PATCH', { stateToken: 'generate' }); sPre.hidden = false; sPre.textContent = `${location.origin}${location.pathname.replace(/\/[^/]*$/, '')}/api/state.php?token=${r.stateToken}\n\nUse this URL as the Home Assistant REST sensor resource (docs/hub/home-assistant.md).`; sOut.className = 'test-out ok'; sOut.textContent = '✓ read token set'; } catch (e) { sOut.className = 'test-out bad'; sOut.textContent = `✗ ${e.message}`; } });
+        }
+      }).catch((e) => box.appendChild(el('div', 'hint bad', `Access settings unavailable here: ${e.message}`)));
+    } else if (step === 8) {
       body.appendChild(el('p', 'lead', 'Review and save. The page reloads with the new settings.'));
       const pre = el('pre', 'preview', JSON.stringify(exportable(), null, 2)); body.appendChild(pre);
       body.appendChild(el('small', 'hint', 'Saved to config.js on the server when this install can write it (hosted with PHP, or tools/serve.py). Otherwise it is kept in this browser and you can download config.js to place next to app.html.'));

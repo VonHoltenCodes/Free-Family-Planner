@@ -5,6 +5,7 @@
  */
 
 define('FP_AUTH', true);
+if (!is_file(__DIR__ . '/includes/auth_config.php')) { header('Location: setup-login.php'); exit; }   // first run: create the login
 require_once __DIR__ . '/includes/auth_config.php';
 
 ini_set('session.cookie_httponly', 1);

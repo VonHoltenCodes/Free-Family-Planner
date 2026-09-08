@@ -19,6 +19,7 @@ Examples:
   ffp meals | meals set Tuesday "Tacos"        ffp chores [kid] | chores set alex "Feed dog" "Homework"
   ffp events | events add "Dentist" 2026-09-10 [2026-09-11] [--all-day]
   ffp state | power | hub todo | hub todo add "Bread"
+  ffp access | access token [generate|remove] | access state-token | access set-login [user]   (set-login needs `ffp login`, not a token)
 Every command prints JSON; add -q for a compact one-liner.
 """
 import argparse, base64, http.cookiejar, json, os, sys, urllib.parse, urllib.request
@@ -134,6 +135,13 @@ def main():
             p = argparse.ArgumentParser(prog='ffp events add'); p.add_argument('summary'); p.add_argument('start'); p.add_argument('end', nargs='?'); p.add_argument('--all-day', action='store_true'); p.add_argument('--location', default=''); t = p.parse_args(rest[1:])
             return show(c.req('POST', 'events', {'summary': t.summary, 'start': t.start, 'end': t.end or t.start, 'allDay': t.all_day or len(t.start) == 10, 'location': t.location}))
         if rest[0] == 'rm': return show(c.req('DELETE', f'events/{rest[1]}'))
+    if k == 'access':
+        sub = rest[0] if rest else 'get'
+        if sub == 'get': return show(c.req('GET', 'access'))
+        if sub == 'token': return show(c.req('PATCH', 'access', {'apiToken': 'generate' if len(rest) < 2 or rest[1] == 'generate' else (None if rest[1] == 'remove' else rest[1])}))
+        if sub == 'state-token': return show(c.req('PATCH', 'access', {'stateToken': 'generate' if len(rest) < 2 else (None if rest[1] == 'remove' else rest[1])}))
+        if sub == 'set-login':
+            import getpass; user = rest[1] if len(rest) > 1 else None; pw = getpass.getpass('new password: '); body = {'password': pw}; body.update({'username': user} if user else {}); return show(c.req('PATCH', 'access', body))
     if k == 'state': return show(c.req('GET', 'state'))
     if k == 'power': return show(c.req('GET', 'power'))
     sys.stderr.write(f'unknown command: {" ".join(cmd)}\n'); ap.print_help(); sys.exit(2)
