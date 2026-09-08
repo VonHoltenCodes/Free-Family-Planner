@@ -54,21 +54,34 @@ function keyboardGuard() {
   c.classList.add('kbd'); c.style.transform = `translateY(${shift}px) scale(${baseViewport.scale})`;
   return true;
 }
+function viewport() {
+  const vv = window.visualViewport;
+  return vv && vv.width > 0 ? { w: vv.width, h: vv.height, x: vv.offsetLeft, y: vv.offsetTop, zoom: vv.scale } : { w: window.innerWidth, h: window.innerHeight, x: 0, y: 0, zoom: 1 };
+}
 function fitCanvas() {
   if (keyboardGuard()) return;
-  const portrait = display.orientation === 'auto' ? window.innerHeight > window.innerWidth : display.orientation === 'portrait';
+  const v = viewport();
+  const portrait = display.orientation === 'auto' ? v.h > v.w : display.orientation === 'portrait';
   const c = $('canvas'); c.classList.toggle('portrait', portrait);
   if (portrait !== lastPortrait) { lastPortrait = portrait; applyLayout(display, portrait, currentScreen(display)); renderTabs(); }
   const [w, h] = portrait ? [1080, 1920] : [1920, 1080];
-  const s = Math.min(window.innerWidth / w, window.innerHeight / h);
+  const s = Math.min(v.w / w, v.h / h);
   c.style.transform = `scale(${s})`;
-  baseViewport = { w: window.innerWidth, h: window.innerHeight, scale: s };
+  // size and place the scaler to the *visible* viewport (handles pinch-zoom, URL bars, side nav bars)
+  const sc = document.querySelector('.scaler'); sc.style.left = `${v.x}px`; sc.style.top = `${v.y}px`; sc.style.width = `${v.w}px`; sc.style.height = `${v.h}px`;
+  baseViewport = { w: v.w, h: v.h, scale: s };
+  if (location.search.includes('debug')) debugReadout(v, s, portrait);
+}
+function debugReadout(v, s, portrait) {
+  let d = $('debug'); if (!d) { d = el('div', 'debug'); d.id = 'debug'; document.body.appendChild(d); }
+  d.textContent = `vv ${Math.round(v.w)}×${Math.round(v.h)} @${v.x},${v.y} zoom ${v.zoom.toFixed(2)} | inner ${window.innerWidth}×${window.innerHeight} | screen ${screen.width}×${screen.height} dpr ${devicePixelRatio} | scale ${s.toFixed(3)} ${portrait ? 'portrait' : 'landscape'} | ${navigator.userAgent.slice(0, 90)}`;
 }
 window.addEventListener('resize', fitCanvas);
 window.visualViewport?.addEventListener('resize', fitCanvas);
 ['orientationchange', 'fullscreenchange', 'pageshow', 'load'].forEach((ev) => window.addEventListener(ev, () => setTimeout(fitCanvas, 150)));
 [300, 1000, 3000].forEach((ms) => setTimeout(fitCanvas, ms));   // Android browsers settle the viewport (URL bar, nav bar) after load
-setInterval(() => { if (!isField(document.activeElement) && (window.innerWidth !== baseViewport.w || window.innerHeight !== baseViewport.h)) fitCanvas(); }, 5000);
+setInterval(() => { const v = viewport(); if (!isField(document.activeElement) && (Math.abs(v.w - baseViewport.w) > 1 || Math.abs(v.h - baseViewport.h) > 1)) fitCanvas(); }, 5000);
+window.visualViewport?.addEventListener('scroll', fitCanvas);
 document.addEventListener('focusin', (e) => { if (isField(e.target)) setTimeout(fitCanvas, 250); });
 document.addEventListener('focusout', () => setTimeout(fitCanvas, 100));
 fitCanvas();
