@@ -8,7 +8,7 @@ still gets a `feat/<name>` branch and a PR.
 | Feature | Branch | What it means |
 |---|---|---|
 | **Desktop app (Windows / macOS)** | `feat/desktop-app` | Serve the planner from a home PC with no Docker or terminal: a tray / menu-bar app bundling `serve.py` + Python, shows the LAN address and a QR code, autostarts at login, optional "show it on this PC" window. Signed installers via the existing Azure Trusted Signing (Windows) and Developer ID + notarization (macOS) pipelines. Issue #17. |
-| **Home hub interop** | `feat/home-hub` | Generic hub adapter, Home Assistant first, Home-IO second: the planner exposed as sensors (`/api/state`), two-way shopping-list sync with the hub's to-do list, and a read-only House panel (thermostat, doors, who's home). Hub token stays server-side. Issue #19. **Shipped so far:** `/api/state` + Home Assistant sensor docs. |
+| **Home hub interop** ✅ | `feat/home-hub` | Generic hub adapter, Home Assistant first, Home-IO second: the planner exposed as sensors (`/api/state`), two-way shopping-list sync with the hub's to-do list, and a read-only House panel (thermostat, doors, who's home). Hub token stays server-side. Issue #19. ✅ **Shipped:** `/api/state` + HA sensor docs, House panel with configurable tiles, two-way shopping-list sync, Home Assistant + Home-IO adapters, `tools/fake-ha.py` for testing. |
 
 ## Shipped in v0.1.0
 

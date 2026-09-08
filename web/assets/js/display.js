@@ -12,9 +12,12 @@ export const PANELS = {
   meals:  { id: 'p-meals',  name: 'Meal plan',       width: 'full', h: '176px' },
   chores: { id: 'p-chores', name: 'Chores',          width: 'half', h: '236px', side: 'left' },
   notes:  { id: 'p-notes',  name: 'Notes',           width: 'half', h: '236px', side: 'right' },
+  house:  { id: 'p-house',  name: 'House (home hub)', width: 'half', h: '236px', side: 'left' },
 };
+const unavailable = new Set(['house']);   // panels that need something configured first
+export function setPanelAvailable(key, ok) { if (ok) unavailable.delete(key); else unavailable.add(key); }
 export const DEFAULT_DISPLAY = {
-  order: ['cal', 'wx', 'shop', 'week', 'meals', 'chores', 'notes'],
+  order: ['cal', 'wx', 'shop', 'week', 'meals', 'chores', 'notes', 'house'],
   hidden: [],
   choresPerKid: 3,
   weekStart: 0,          // 0 = Sunday, 1 = Monday
@@ -23,6 +26,7 @@ export const DEFAULT_DISPLAY = {
   orientation: 'auto',   // 'auto' | 'portrait' | 'landscape'
   theme: 'hifi',         // 'hifi' | 'lcars' | 'paper' | 'contrast'
   dim: { enabled: false, from: '22:00', to: '06:00', level: 0.85 },
+  hubSync: false,        // this screen runs the shopping-list ↔ hub to-do sync
 };
 
 export function loadDisplay() {
@@ -46,8 +50,8 @@ export function applyTheme(d) {
 const px = (h) => (h === '1fr' ? 0 : parseInt(h, 10));
 export function applyLayout(d, portrait) {
   const main = document.querySelector('.main');
-  const visible = d.order.filter((k) => !d.hidden.includes(k));
-  Object.entries(PANELS).forEach(([k, p]) => { const e = document.getElementById(p.id); e.hidden = d.hidden.includes(k); e.style.gridArea = ''; e.style.gridColumn = ''; e.style.gridRow = ''; });
+  const visible = d.order.filter((k) => !d.hidden.includes(k) && !unavailable.has(k));
+  Object.entries(PANELS).forEach(([k, p]) => { const e = document.getElementById(p.id); e.hidden = d.hidden.includes(k) || unavailable.has(k); e.style.gridArea = ''; e.style.gridColumn = ''; e.style.gridRow = ''; });
   document.querySelectorAll('.col, .row.bottom').forEach((c) => { c.style.display = ''; c.style.gridTemplateRows = ''; c.style.gridTemplateColumns = ''; c.hidden = false; });
   main.style.gridTemplateRows = ''; main.style.gridTemplateColumns = '';
 
@@ -76,12 +80,13 @@ export function applyLayout(d, portrait) {
   right.style.gridTemplateRows = show('wx') && show('shop') ? '528px 1fr' : '1fr';
   const leftOn = show('cal') || show('week'); const rightOn = show('wx') || show('shop');
   left.hidden = !leftOn; right.hidden = !rightOn;
-  const bottomOn = show('meals') || show('chores') || show('notes'); bottom.hidden = !bottomOn;
+  const bottomOn = show('meals') || show('chores') || show('notes') || show('house'); bottom.hidden = !bottomOn;
   main.style.gridTemplateColumns = leftOn && rightOn ? '1176px 1fr' : '1fr';
   main.style.gridTemplateRows = (leftOn || rightOn) && bottomOn ? '1fr 206px' : '1fr';
   if (!(leftOn || rightOn)) bottom.style.gridTemplateRows = '';
   bottom.style.gridColumn = '1/-1';
-  const cols = []; if (show('meals')) cols.push('1fr'); if (show('chores')) cols.push(show('meals') ? '560px' : '1fr'); if (show('notes')) cols.push(show('meals') ? '460px' : '1fr');
+  const cols = []; const extra = (show('chores') ? 1 : 0) + (show('notes') ? 1 : 0) + (show('house') ? 1 : 0);
+  if (show('meals')) cols.push('1fr'); ['chores', 'notes', 'house'].forEach((k) => { if (show(k)) cols.push(show('meals') ? (extra >= 3 ? '400px' : k === 'chores' ? '560px' : '460px') : '1fr'); });
   bottom.style.gridTemplateColumns = cols.join(' ');
 }
 
@@ -133,6 +138,8 @@ export function openDisplaySettings(d, onChange) {
   body.appendChild(opt('Clock', [[false, '12-hour'], [true, '24-hour']], d.clock24, (v) => { d.clock24 = v; }));
   body.appendChild(opt('Units', [['us', '°F / mph'], ['metric', '°C / km/h']], d.units, (v) => { d.units = v; }));
   body.appendChild(opt('Orientation', [['auto', 'Auto'], ['portrait', 'Portrait'], ['landscape', 'Landscape']], d.orientation, (v) => { d.orientation = v; }));
+  body.appendChild(opt('Hub shopping sync', [[false, 'Off'], [true, 'This screen syncs']], d.hubSync, (v) => { d.hubSync = v; }));
+  body.appendChild(el('small', 'hint', 'Turn on for exactly one screen (the wall display) so the shopping list and the hub\'s to-do list stay in step.'));
   body.appendChild(el('div', 'sect', 'Night dim — darken the screen on a schedule; any touch wakes it for a minute'));
   const dimRow = el('div', 'opt');
   const dchk = el('button', 'chk' + (d.dim.enabled ? ' on' : '')); dchk.type = 'button'; dchk.addEventListener('click', () => { d.dim.enabled = !d.dim.enabled; dchk.classList.toggle('on', d.dim.enabled); commit(); });
