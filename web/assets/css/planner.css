@@ -240,7 +240,12 @@ select option{background:var(--panel);color:var(--text);}
 .status .pill.m{width:20px;background:var(--lc-mauve);}
 .status .pill.b{width:58px;background:var(--lc-blue);}
 .status .sep{color:var(--text-mute);}
-.status .footer-text{display:contents;}
+.status .footer-text{display:flex;gap:10px;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;}
+.status .footer-text span{white-space:nowrap;}
+.status > *{white-space:nowrap;flex:none;}
+.status .footer-text{flex:0 1 auto;}
+.status .grow{flex:1 1 0;min-width:4px;}
+.status .svc{white-space:nowrap;}
 .status .grow{flex:1;}
 .status .svc{display:flex;align-items:center;gap:5px;}
 .status .led{width:8px;height:8px;border-radius:50%;background:var(--lcd-bg);box-shadow:inset 0 0 2px #000;}
@@ -307,7 +312,9 @@ select option{background:var(--panel);color:var(--text);}
 .canvas.portrait .chore input[type=text]{font-size:14px;padding:4px 8px;}
 .canvas.portrait .checklist li{font-size:15px;padding:4px 8px;}
 .canvas.portrait .field input[type=text]{font-size:15px;padding:5px 9px;}
-.canvas.portrait .status{gap:10px;font-size:10px;letter-spacing:1px;}
+.canvas.portrait .status{gap:8px;font-size:10px;letter-spacing:1px;}
+.canvas.portrait .status .footer-text{gap:6px;}
+.canvas.portrait .status .svc{gap:3px;}
 .canvas.portrait .status .pill.b{width:40px;}
 .canvas.portrait .dlg{width:640px;}
 
