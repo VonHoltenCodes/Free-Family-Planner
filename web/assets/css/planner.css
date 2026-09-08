@@ -681,3 +681,6 @@ select option{background:var(--panel);color:var(--text);}
 .canvas.theme-eink .pw-fill,.canvas.theme-eink .pw-bar.high .pw-fill{background:#7a7975;}
 .canvas.theme-eink .pw-bar.spike .pw-fill{background:#1d1d1b;}
 .canvas.theme-eink .pw-banner,.canvas.theme-eink .hdr-alert{background:#1d1d1b;color:#f6f5f0;border-color:#1d1d1b;animation:none;}
+.tile.camera .cam-cap{position:absolute;left:0;right:0;bottom:0;padding:3px 8px;font-family:var(--font-pixel);font-size:10px;letter-spacing:1px;color:#fff;background:rgba(0,0,0,.55);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.tile.camera.warn .cam-cap{background:rgba(255,59,46,.7);}
+.tile.camera.ctl::after{display:none;}

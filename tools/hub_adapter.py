@@ -39,13 +39,16 @@ class HomeAssistant:
             if s.get('entity_id') in want:
                 a = s.get('attributes', {})
                 out[s['entity_id']] = {'state': s.get('state'), 'unit': a.get('unit_of_measurement'), 'name': a.get('friendly_name'), 'deviceClass': a.get('device_class'),
-                                       'attrs': {k: a[k] for k in ('temperature', 'current_temperature', 'hvac_action', 'target_temp_high', 'target_temp_low', 'brightness', 'battery_level', 'media_title', 'media_artist', 'source', 'percentage') if k in a}, 'updated': s.get('last_updated')}
+                                       'attrs': {k: a[k] for k in ('temperature', 'current_temperature', 'hvac_action', 'target_temp_high', 'target_temp_low', 'brightness', 'battery_level', 'media_title', 'media_artist', 'source', 'percentage', 'thumbnail', 'motion_enabled', 'motion_detected', 'battery', 'last_record', 'brand') if k in a}, 'updated': s.get('last_updated')}
         return out
     ACTIONS = {'toggle': None, 'turn_on': None, 'turn_off': None, 'lock': 'lock', 'unlock': 'lock', 'open': 'cover', 'close': 'cover'}
     def call(self, entity, action):
         dom = entity.split('.')[0]
         svc = {'toggle': (dom if dom in ('light', 'switch', 'input_boolean', 'fan') else 'homeassistant', 'toggle'), 'turn_on': (dom, 'turn_on'), 'turn_off': (dom, 'turn_off'),
                'lock': ('lock', 'lock'), 'unlock': ('lock', 'unlock'), 'open': ('cover', 'open_cover'), 'close': ('cover', 'close_cover')}.get(action)
+        if action == 'snapshot':
+            if dom != 'camera': raise HubError('snapshot is for cameras')
+            _req('POST', f'{self.url}/api/services/blink/trigger_camera', self.token, {'entity_id': entity}); return True   # Blink: take a fresh picture
         if not svc: raise HubError(f'unknown action {action}')
         _req('POST', f'{self.url}/api/services/{svc[0]}/{svc[1]}', self.token, {'entity_id': entity}); return True
     def calendars(self): return [{'id': c['entity_id'], 'name': c.get('name', c['entity_id'])} for c in _req('GET', f'{self.url}/api/calendars', self.token)]

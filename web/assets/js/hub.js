@@ -39,6 +39,7 @@ export function tileKind(ent) {
   return 'value';
 }
 const WX_WORDS = { partlycloudy: 'partly cloudy', 'clear-night': 'clear night', 'lightning-rainy': 'thunderstorms', 'snowy-rainy': 'snow and rain', pouring: 'heavy rain', rainy: 'rain', snowy: 'snow', sunny: 'sunny', cloudy: 'cloudy', fog: 'fog', hail: 'hail', windy: 'windy', 'windy-variant': 'windy', exceptional: 'severe' };
+const ageText = (t) => { const m = Math.round((Date.now() - t) / 60000); if (m < 1) return 'just now'; if (m < 60) return `${m} min ago`; const h = Math.round(m / 60); if (h < 48) return `${h} h ago`; const d = Math.round(h / 24); return d < 60 ? `${d} d ago` : `${Math.round(d / 30)} mo ago`; };
 const fmt = (n) => (n == null || n === '' ? '—' : (Number.isFinite(+n) ? String(Math.round(+n * 10) / 10) : String(n)));
 function tileFace(kind, s) {
   const st = s?.state ?? 'unknown'; const a = s?.attrs || {};
@@ -60,7 +61,8 @@ const CONTROL = { onoff: ['toggle'], lock: ['lock', 'unlock'], cover: ['open', '
 export function mountHouse(host, tiles, onStatus, { toast } = {}) {
   host.innerHTML = '';
   if (!tiles.length) { host.appendChild(el('div', 'empty', 'Pick tiles in ⚙ Setup → Home hub.')); return () => {}; }
-  const nodes = tiles.map((t) => { const n = el('div', 'tile'); n.dataset.entity = t.entity; n.appendChild(el('div', 'tl', t.label || t.entity)); if ((t.kind || tileKind({ id: t.entity })) === 'camera') { const img = el('img', 'cam'); img.alt = t.label || t.entity; n.appendChild(img); n.classList.add('camera'); } else { n.appendChild(el('div', 'tb', '—')); n.appendChild(el('div', 'ts', '')); } host.appendChild(n); return n; });
+  const nodes = tiles.map((t) => { const n = el('div', 'tile'); n.dataset.entity = t.entity; n.appendChild(el('div', 'tl', t.label || t.entity)); if ((t.kind || tileKind({ id: t.entity })) === 'camera') { const img = el('img', 'cam'); img.alt = t.label || t.entity; n.appendChild(img); n.appendChild(el('div', 'cam-cap', '')); n.classList.add('camera', 'ctl'); n.tabIndex = 0; n.setAttribute('role', 'button'); n.title = 'Tap for a fresh picture';
+      n.addEventListener('click', async () => { n.classList.add('busy'); n.querySelector('.cam-cap').textContent = 'asking camera…'; try { await hub.call(t.entity, 'snapshot'); toast?.(`${t.label || t.entity}: new picture requested`); setTimeout(refresh, 8000); setTimeout(refresh, 16000); } catch (e) { toast?.(`${t.label || t.entity}: ${e.message}`); } finally { setTimeout(() => n.classList.remove('busy'), 8000); } }); } else { n.appendChild(el('div', 'tb', '—')); n.appendChild(el('div', 'ts', '')); } host.appendChild(n); return n; });
   let lastStates = {};
   const act = async (t, n) => {
     const kind = n.dataset.kind; const s = lastStates[t.entity]; if (!t.control || !CONTROL[kind]) return;
@@ -78,7 +80,11 @@ export function mountHouse(host, tiles, onStatus, { toast } = {}) {
     try {
       const states = await hub.states(tiles.map((t) => t.entity)); lastStates = states;
       tiles.forEach((t, i) => { const s = states[t.entity]; const kind = t.kind || tileKind({ id: t.entity, deviceClass: s?.deviceClass }); nodes[i].dataset.kind = kind;
-        if (kind === 'camera') { const img = nodes[i].querySelector('img.cam'); img.src = `api/hub.php?op=camera&entity=${encodeURIComponent(t.entity)}&_=${Date.now()}`; nodes[i].className = `tile camera${s ? ' on' : ' offline'}`; return; }
+        if (kind === 'camera') { const img = nodes[i].querySelector('img.cam'); const a = s?.attrs || {};
+          const ts = (a.thumbnail || '').match(/[?&]ts=(\d+)/); const age = ts ? ageText(+ts[1] * 1000) : (s?.updated ? ageText(Date.parse(s.updated)) : '');
+          const key = ts ? ts[1] : String(s?.updated || ''); if (img.dataset.key !== key) { img.dataset.key = key; img.src = `api/hub.php?op=camera&entity=${encodeURIComponent(t.entity)}&_=${Date.now()}`; }
+          nodes[i].querySelector('.cam-cap').textContent = [age && `picture ${age}`, a.motion_enabled === false ? 'motion off' : a.motion_detected ? 'MOTION' : '', a.battery && a.battery !== 'ok' ? `battery ${a.battery}` : ''].filter(Boolean).join(' · ');
+          nodes[i].className = `tile camera ctl${s ? ' on' : ' offline'}${a.motion_detected ? ' warn' : ''}`; return; }
         const f = tileFace(kind, s);
         nodes[i].querySelector('.tb').textContent = f.big; nodes[i].querySelector('.ts').textContent = f.small; nodes[i].className = `tile ${kind}${f.on ? ' on' : ''}${f.warn ? ' warn' : ''}${s ? '' : ' offline'}${t.control && CONTROL[kind] ? ' ctl' : ''}`; });
       onStatus?.('on');
