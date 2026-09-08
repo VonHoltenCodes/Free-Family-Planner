@@ -35,7 +35,7 @@ call(service, data)              # later, for toggles
 
 ## Checklist
 - [ ] design agreed in #19
-- [ ] `/api/state` + HA sensor docs
+- [x] `/api/state` + HA sensor docs (PR #21, merged)
 - [ ] hub adapter interface + Home Assistant adapter (serve.py + PHP)
 - [ ] shopping-list sync
 - [ ] House panel + wizard step
