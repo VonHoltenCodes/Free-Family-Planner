@@ -6,8 +6,10 @@
 function fp_auth_file() { return __DIR__ . '/../includes/auth_config.php'; }
 function fp_auth_exists() { return is_file(fp_auth_file()); }
 function fp_auth_read_constants() {
+    $keys = ['FP_USERNAME', 'FP_PASSWORD_HASH', 'FP_SESSION_NAME', 'FP_SESSION_LIFETIME', 'FP_API_TOKEN', 'FP_STATE_TOKEN', 'FP_TIMEZONE', 'FP_TITLE', 'FP_SUBTITLE', 'FP_FOOTER'];
+    if (defined('FP_USERNAME')) { $out = []; foreach ($keys as $k) if (defined($k)) $out[$k] = constant($k); return $out; }   // file already loaded: exact values
     $out = []; $src = @file_get_contents(fp_auth_file()); if ($src === false) return $out;
-    if (preg_match_all("/define\('([A-Z_]+)',\s*(.*?)\);/s", $src, $m, PREG_SET_ORDER)) foreach ($m as $x) { $v = trim($x[2]); if (preg_match("/^'(.*)'$/s", $v, $q)) $v = str_replace("\\'", "'", $q[1]); elseif (preg_match('/^"(.*)"$/s', $v, $q)) $v = $q[1]; $out[$x[1]] = $v; }
+    if (preg_match_all("/define\(\s*['\"]([A-Z_]+)['\"]\s*,\s*(.*?)\);/s", $src, $m, PREG_SET_ORDER)) foreach ($m as $x) { $v = trim($x[2]); if (preg_match("/^'(.*)'$/s", $v, $q)) $v = str_replace("\\'", "'", $q[1]); elseif (preg_match('/^"(.*)"$/s', $v, $q)) $v = $q[1]; elseif (preg_match('/^[\d\s*+\-()]+$/', $v)) $v = (int)eval("return $v;"); $out[$x[1]] = $v; }
     return $out;
 }
 /** Write auth_config.php with the given constants (username/hash/session/token/branding). */
