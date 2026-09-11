@@ -3,6 +3,8 @@
 // mode of family / command / both (tabs, optional auto-rotate). Each screen has its own panel order,
 // hidden set and which panels are shown full-width.
 const LS = 'fp.display';
+import { SAVERS } from './screensaver.js';
+
 const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
 
 export const PANELS = {
@@ -34,6 +36,8 @@ export const DEFAULT_DISPLAY = {
   screens: structuredClone(DEFAULT_SCREENS),
   choresPerKid: 3, weekStart: 0, clock24: false, units: 'us', orientation: 'auto', theme: 'hifi',
   dim: { enabled: false, from: '22:00', to: '06:00', level: 0.85 },
+  saver: 'drift', saverMinutes: 20, pixelShift: true,   // burn-in care for an always-on display
+  nightlyReload: 4,                                      // quiet-hour reload (hour, -1 = off)
   hubSync: false,
 };
 
@@ -135,6 +139,7 @@ export function applyTheme(d) {
 
 /* ---------- settings dialog ---------- */
 export function openDisplaySettings(d, config, onChange, { openTiles } = {}) {
+  // SAVERS comes from screensaver.js; imported at the top
   if (document.getElementById('display-overlay')) return;
   const overlay = el('div', 'overlay'); overlay.id = 'display-overlay';
   const dlg = el('div', 'dlg setup display');
@@ -177,6 +182,13 @@ export function openDisplaySettings(d, config, onChange, { openTiles } = {}) {
   body.appendChild(opt('Orientation', [['auto', 'Auto'], ['portrait', 'Portrait'], ['landscape', 'Landscape']], d.orientation, (v) => { d.orientation = v; }));
   body.appendChild(opt('Hub shopping sync', [[false, 'Off'], [true, 'This screen syncs']], d.hubSync, (v) => { d.hubSync = v; }));
   body.appendChild(el('small', 'hint', 'Turn on for exactly one screen (the wall display) so the shopping list and the hub\'s to-do list stay in step.'));
+  body.appendChild(el('div', 'sect', 'Screen care — this display is on 24/7'));
+  body.appendChild(opt('Screensaver', SAVERS, d.saver, (v) => { d.saver = v; }));
+  body.appendChild(opt('Starts after', [[5, '5 min'], [10, '10 min'], [20, '20 min'], [45, '45 min'], [120, '2 h']], d.saverMinutes, (v) => { d.saverMinutes = v; }));
+  body.appendChild(opt('Pixel shift', [[true, 'On'], [false, 'Off']], d.pixelShift, (v) => { d.pixelShift = v; }));
+  body.appendChild(el('small', 'hint', 'The screensaver drifts a clock around a dark screen when nobody has touched the display; any touch brings the planner back. Pixel shift nudges the whole layout a couple of pixels every few minutes so panel edges do not burn in.'));
+  body.appendChild(opt('Nightly refresh', [[-1, 'Off'], [3, '3 AM'], [4, '4 AM'], [5, '5 AM']], d.nightlyReload, (v) => { d.nightlyReload = v; }));
+  body.appendChild(el('small', 'hint', 'Reloads the page once in the small hours. Long-running browsers get slow and occasionally wedge; this clears it before anyone is up.'));
   body.appendChild(el('div', 'sect', 'Night dim — darken the screen on a schedule; any touch wakes it for a minute'));
   const dimRow = el('div', 'opt');
   const dchk = el('button', 'chk' + (d.dim.enabled ? ' on' : '')); dchk.type = 'button'; dchk.addEventListener('click', () => { d.dim.enabled = !d.dim.enabled; dchk.classList.toggle('on', d.dim.enabled); commit(); });

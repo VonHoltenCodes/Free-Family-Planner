@@ -8,6 +8,8 @@ import { openSetup } from './setup.js';
 import { stateSet } from './state-publisher.js';
 import { hub, mountHouse, startTodoSync } from './hub.js';
 import { mountPower } from './power.js';
+import { startWatchdog, beat, health, noteError } from './watchdog.js';
+import { startPixelShift, startScreensaver } from './screensaver.js';
 import { loadDisplay, applyLayout, applyTheme, startDim, openDisplaySettings, setPanelAvailable, currentScreen, defaultTab, SCREENS, PANELS } from './display.js';
 
 const config = await loadConfig();
@@ -34,8 +36,18 @@ $('hdr-subtitle').textContent = config.family.subtitle;
 $('wx-place').textContent = config.location.label || '';
 stateSet('family', { title: config.family.title, subtitle: config.family.subtitle, location: config.location.label || '' });
 $('btn-setup').addEventListener('click', () => openSetup(config));
-$('btn-display').addEventListener('click', () => openDisplaySettings(display, config, () => { if (display.choresPerKid !== CHORES_PER_KID) { location.reload(); return; } lastPortrait = null; fitCanvas(); tickClock(); if (config.location.lat != null) refreshWx(); if (typeof renderAll === 'function') renderAll(); dimTick(); }, { openTiles: () => openSetup(config, { step: 6 }) }));
+$('btn-display').addEventListener('click', () => openDisplaySettings(display, config, () => {
+  stopShift(); stopShift = startPixelShift(display.pixelShift); saver.wake(); if (display.choresPerKid !== CHORES_PER_KID) { location.reload(); return; } lastPortrait = null; fitCanvas(); tickClock(); if (config.location.lat != null) refreshWx(); if (typeof renderAll === 'function') renderAll(); dimTick(); }, { openTiles: () => openSetup(config, { step: 6 }) }));
 const dimTick = startDim(display);
+let stopShift = startPixelShift(display.pixelShift);
+const saver = startScreensaver(display, () => {
+  const next = expanded.map((r) => r).sort((a, b) => (a.key || '').localeCompare(b.key || '')).find((r) => r.key >= todayKey);
+  const p = config.power?.provider === 'comed' ? (document.querySelector('#power .pw-big')?.textContent || '') : '';
+  return { line: next ? `${next.key === todayKey ? 'Today' : new Date(next.key + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long' })} — ${next.ev.summary || ''}` : '',
+           sub: [$('hdr-temp').textContent !== '--' ? `${$('hdr-temp').textContent}°${display.units === 'metric' ? 'C' : 'F'} ${$('hdr-cond').textContent}` : '', p ? `${p}¢/kWh` : ''].filter(Boolean).join('  ·  ') };
+});
+startWatchdog({ frame: $('wx-frame'), nightlyHour: display.nightlyReload, recycleHours: 6, onStatus: (s, why) => { if (why) console.warn('watchdog:', why); } });
+setInterval(() => stateSet('health', health()), 60_000);
 if (!isConfigured(config)) setTimeout(() => openSetup(config, { firstRun: true }), 600);
 { const f = $('status-footer'); f.innerHTML = ''; (config.family.footer || []).forEach((t, i) => { if (i) f.appendChild(el('span', 'sep', '•')); f.appendChild(el('span', null, t)); }); }
 
@@ -119,7 +131,7 @@ function tickClock() {
   const k = dateKey(now);
   if (k !== todayKey) { todayKey = k; onNewDay.forEach((f) => f()); }
 }
-setInterval(tickClock, 1000);
+setInterval(() => { tickClock(); beat('clock', 1000); }, 1000);
 tickClock();
 
 /* ---------- fullscreen ---------- */
@@ -135,7 +147,7 @@ async function refreshWx() {
     $('hdr-temp').textContent = wxProvider === 'card' ? w.temp : (display.units === 'metric' ? Math.round((w.tempF - 32) * 5 / 9) : w.tempF);
     document.querySelector('.lcd.temp .unit').textContent = display.units === 'metric' ? '°C' : '°F';
     $('hdr-cond').textContent = w.cond;
-    led('led-wx', 'on'); stateSet('weather', { temp: Number($('hdr-temp').textContent), cond: w.cond, units: display.units, provider: wxProvider });
+    led('led-wx', 'on'); beat('weather', 10 * 60_000); stateSet('weather', { temp: Number($('hdr-temp').textContent), cond: w.cond, units: display.units, provider: wxProvider });
   } catch (e) { console.warn('weather:', e); led('led-wx', 'warn'); }
 }
 (async () => {
@@ -181,7 +193,7 @@ function bindList(name, formId, inputId, listId, countId) {
     try { await store.addListItem(name, text); } catch (err) { toast('Save failed'); console.error(err); }
   });
   store.watchList(name, (items) => {
-    led('led-fb', 'on'); stateSet(name, items); listCache[name] = items;
+    led('led-fb', 'on'); beat(`list:${name}`, 60_000); stateSet(name, items); listCache[name] = items;
     list.innerHTML = '';
     if (!items.length) { list.appendChild(el('li', 'empty', 'Nothing here.')); }
     items.forEach((it) => {
@@ -363,7 +375,7 @@ async function loadEvents(showBusy = true) {
     if (gcal?.signedIn && !gcal.calendars.length) { await gcal.listCalendars(); renderCalSelect(); }
     const all = await cal.loadAll();
     events = all.filter((e) => !e.isHoliday); holidays = all.filter((e) => e.isHoliday); stateSet('events', events);
-    expandAll(); renderAll();
+    expandAll(); renderAll(); beat('calendar', 15 * 60_000);
     const feedErr = Object.values(cal.status || {}).some((v) => typeof v === 'string');
     led('led-gc', feedErr ? 'warn' : ((gcal?.signedIn || cal.ics.length || cal.local) ? 'on' : ''));
     const parts = []; if (gcal?.signedIn) parts.push(gcal.calendars.find((c) => c.id === gcal.calendarId)?.summary || 'Google'); cal.ics.forEach((f) => parts.push(f.name)); cal.ha.forEach((f) => parts.push(f.name)); if (cal.local) parts.push(cal.local.name);

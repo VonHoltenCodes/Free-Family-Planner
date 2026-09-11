@@ -1,7 +1,7 @@
 // Publishes a small read-only snapshot of what the wall shows to the server (PUT api/state.php),
 // so home hubs (Home Assistant's REST sensor, Home-IO) can read "tonight's dinner", open shopping
 // items, chores done, next events and the outside temperature without any integration to install.
-const snap = { meals: {}, shopping: [], notes: [], chores: {}, events: [], weather: null, family: {}, power: null };
+const snap = { meals: {}, shopping: [], notes: [], chores: {}, events: [], weather: null, family: {}, power: null, health: null };
 let timer = null; let lastSent = 0; let enabled = true;
 const FULL = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
@@ -21,6 +21,7 @@ function build() {
     chores: Object.fromEntries(Object.entries(snap.chores || {}).map(([id, k]) => [id, { name: k.name, done: k.items.filter((c) => c.completed && c.text).length, total: k.items.filter((c) => c.text).length, items: k.items.filter((c) => c.text).map((c) => ({ text: c.text, completed: !!c.completed })) }])),
     events: evs, weather: snap.weather, power: snap.power,
     display: snap.display,   // viewport diagnostics from the wall (helps support layout issues)
+    health: snap.health,     // uptime, heartbeats, recent errors (see watchdog.js)
   };
 }
 async function publish() {
