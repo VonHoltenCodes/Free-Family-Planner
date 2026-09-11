@@ -123,6 +123,25 @@ House tiles on the Command screen can be **tap to control**: lights, switches an
 covers open and close, locks ask for confirmation. Camera tiles show a live still refreshed every
 15 s; media players show what is playing.
 
+## Screen care (it runs 24/7)
+A wall display is on all day for years, so the app looks after the panel and after itself:
+- **Screensaver** after an idle stretch — a clock, the next event, the temperature and the price
+  drifting slowly around a dark screen. Styles: drifting, bouncing, starfield, or plain black.
+  Any touch brings the planner straight back.
+- **Pixel shift** nudges the whole layout a couple of pixels every few minutes so panel edges and the
+  clock never sit on the same pixels for weeks.
+- **Night dim** on a schedule (below), which also cuts wear.
+- **A watchdog** keeps a heartbeat on the clock, the calendar, the weather and the lists. A stale feed
+  is flagged; a genuinely wedged page reloads itself (and never loops — three reloads in half an hour
+  and it stops and keeps the evidence instead). A sleeping device is told apart from a wedged one.
+- **Nightly refresh** in a quiet hour, and the bundled WeatherStar app is recycled every six hours —
+  browsers left running for days get slow, and this clears it before anyone is up.
+- What it learns (uptime, heartbeats, memory, recent errors, why it last reloaded) rides along in
+  `/api/state`, so a freeze can be diagnosed after the fact: `ffp state | jq .health`.
+
+If the browser itself hangs hard, no in-page watchdog can help — use a kiosk browser with its own
+reload schedule (Fully Kiosk can reload on a timer) as a belt-and-braces backstop.
+
 ## Display settings
 The **☰ Display** button (status bar) opens per-screen settings saved in that browser: show/hide
 and reorder panels, chores per kid, week start, 12/24-hour clock, °F/°C, force portrait or

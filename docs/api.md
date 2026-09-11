@@ -84,7 +84,7 @@ use the Firebase tooling for those.
 ### Read-only feeds
 | | |
 |---|---|
-| `GET /state` | what the wall shows — meals, lists, chores, next events, weather, electricity, plus the display's viewport diagnostics (also at `/api/state` for Home Assistant's REST sensor, see [hub/home-assistant.md](hub/home-assistant.md)) |
+| `GET /state` | what the wall shows — meals, lists, chores, next events, weather, electricity, plus the display's viewport diagnostics and `health` (uptime, heartbeats, memory, recent errors, last reload reason) (also at `/api/state` for Home Assistant's REST sensor, see [hub/home-assistant.md](hub/home-assistant.md)) |
 | `GET /power` | ComEd hourly pricing: current, 5-minute, today's and tomorrow's day-ahead hours |
 
 ## Notes
