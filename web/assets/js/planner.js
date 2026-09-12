@@ -47,6 +47,7 @@ const saver = startScreensaver(display, () => {
            sub: [$('hdr-temp').textContent !== '--' ? `${$('hdr-temp').textContent}°${display.units === 'metric' ? 'C' : 'F'} ${$('hdr-cond').textContent}` : '', p ? `${p}¢/kWh` : ''].filter(Boolean).join('  ·  ') };
 });
 startWatchdog({ frame: $('wx-frame'), nightlyHour: display.nightlyReload, recycleHours: 6, onStatus: (s, why) => { if (why) console.warn('watchdog:', why); } });
+stateSet('health', health());
 setInterval(() => stateSet('health', health()), 60_000);
 if (!isConfigured(config)) setTimeout(() => openSetup(config, { firstRun: true }), 600);
 { const f = $('status-footer'); f.innerHTML = ''; (config.family.footer || []).forEach((t, i) => { if (i) f.appendChild(el('span', 'sep', '•')); f.appendChild(el('span', null, t)); }); }
@@ -187,6 +188,10 @@ if (config.power?.provider === 'comed') {
 const listCache = { shopping: [], notes: [] };
 function bindList(name, formId, inputId, listId, countId) {
   const list = $(listId); const input = $(inputId);
+  // Firestore only calls back on change, so a quiet list must not look dead to the watchdog:
+  // keep beating while the subscription is healthy, and stop only when it actually errors.
+  let alive = true;
+  setInterval(() => { if (alive) beat(`list:${name}`, 60_000); }, 60_000);
   $(formId).addEventListener('submit', async (e) => {
     e.preventDefault(); const text = input.value.trim(); if (!text) return;
     input.value = '';
@@ -369,9 +374,12 @@ function renderWeek() {
 }
 function renderAll() { renderMonth(); renderDay(); renderWeek(); }
 
-async function loadEvents(showBusy = true) {
+async function loadEvents(showBusy = true, retry = true) {
   if (showBusy) $('cal-refresh').disabled = true;
   try {
+    // Google access tokens last about an hour and nobody is standing at the wall to sign in again,
+    // so renew silently before a load that needs it.
+    if (gcal?.needsRefresh()) { try { await gcal.refresh(); } catch (e) { noteError('gcal', `silent refresh failed: ${e.message}`); } }
     if (gcal?.signedIn && !gcal.calendars.length) { await gcal.listCalendars(); renderCalSelect(); }
     const all = await cal.loadAll();
     events = all.filter((e) => !e.isHoliday); holidays = all.filter((e) => e.isHoliday); stateSet('events', events);
@@ -383,7 +391,13 @@ async function loadEvents(showBusy = true) {
     setWriteUI();
   } catch (e) {
     console.error('calendar load:', e); led('led-gc', 'err');
-    if (e.status === 401) { setAuthUI(false, 'Session expired — sign in again'); } else toast('Calendar load failed');
+    noteError('gcal', `load failed: ${e.status || ''} ${e.message || e.result?.error?.message || ''}`.trim());
+    if (e.status === 401 && retry) {                       // token died mid-flight: renew quietly and try again
+      try { await gcal.refresh(); $('cal-refresh').disabled = false; return loadEvents(false, false); }
+      catch (err) { noteError('gcal', `re-auth failed: ${err.message}`); }
+    }
+    if (e.status === 401) setAuthUI(false, 'Google sign-in expired — tap to sign in again');
+    else toast('Calendar load failed');
   } finally { $('cal-refresh').disabled = false; }
 }
 function setWriteUI() { const w = cal.writable().length > 0; $('cal-add').hidden = !w; $('dp-add').hidden = !w; }
@@ -481,3 +495,4 @@ renderAll();
 })();
 onNewDay.push(() => { const n = new Date(); selected = n; viewYM = { y: n.getFullYear(), m: n.getMonth() }; renderAll(); });
 setInterval(() => loadEvents(false), 15 * 60 * 1000);   // keep the wall display fresh
+setInterval(() => { if (gcal?.needsRefresh()) gcal.refresh().catch((e) => noteError('gcal', `keep-alive refresh failed: ${e.message}`)); }, 10 * 60 * 1000);
