@@ -17,6 +17,8 @@ export class GCal {
     this.calendars = [];
     this.tokenClient = null;
     this.onAuthChange = () => {};
+    this.expiresAt = 0;      // Google access tokens last about an hour; we renew before that
+    this._pending = null;
   }
 
   async init() {
@@ -29,8 +31,11 @@ export class GCal {
       client_id: this.clientId,
       scope: SCOPES,
       callback: (resp) => {
-        if (resp.error) { this.signedIn = false; this.onAuthChange(false, resp.error); return; }
+        const p = this._pending; this._pending = null;
+        if (resp.error) { this.signedIn = false; this.expiresAt = 0; p?.reject(new Error(resp.error)); this.onAuthChange(false, resp.error); return; }
         this.signedIn = true;
+        this.expiresAt = Date.now() + (Number(resp.expires_in || 3600) - 300) * 1000;   // renew 5 min early
+        p?.resolve(true);
         this.onAuthChange(true);
       },
     });
@@ -43,10 +48,26 @@ export class GCal {
     this.tokenClient.requestAccessToken({ prompt: silent ? '' : 'consent' });
   }
 
+  /* Awaitable silent refresh — the wall never has anyone to click "sign in again". */
+  refresh() {
+    return new Promise((resolve, reject) => {
+      if (!this.tokenClient) { reject(new Error('auth not ready')); return; }
+      if (this._pending) { reject(new Error('a token request is already in flight')); return; }
+      this._pending = { resolve, reject };
+      const bail = setTimeout(() => { if (this._pending) { this._pending = null; reject(new Error('token refresh timed out')); } }, 20_000);
+      const done = () => clearTimeout(bail);
+      const p = this._pending; this._pending = { resolve: (v) => { done(); p.resolve(v); }, reject: (e) => { done(); p.reject(e); } };
+      try { this.tokenClient.requestAccessToken({ prompt: '' }); } catch (e) { this._pending = null; done(); reject(e); }
+    });
+  }
+
+  /* True when the token is missing or about to expire. */
+  needsRefresh() { return this.signedIn && Date.now() >= this.expiresAt; }
+
   signOut() {
     const token = window.gapi.client.getToken();
     if (token) { window.google.accounts.oauth2.revoke(token.access_token); window.gapi.client.setToken(null); }
-    this.signedIn = false;
+    this.signedIn = false; this.expiresAt = 0;
     this.onAuthChange(false);
   }
 
