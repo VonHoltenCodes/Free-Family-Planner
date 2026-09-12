@@ -206,7 +206,7 @@ function bindList(name, formId, inputId, listId, countId) {
       li.append(chk, txt, del); list.appendChild(li);
     });
     if (countId) { const open = items.filter((i) => !i.completed).length; $(countId).textContent = items.length ? `${open} open / ${items.length}` : ''; }
-  }, () => led('led-fb', store.configured ? 'err' : 'warn'));
+  }, (e) => { alive = false; noteError('store', `${name}: ${e?.message || e}`); led('led-fb', store.configured ? 'err' : 'warn'); });
 }
 if (!store.configured) led('led-fb', 'warn');
 $('led-fb-label').textContent = { firestore: 'FIRESTORE', sync: 'SYNC STORE', local: 'LOCAL DATA' }[store.backendName] || 'NO DATA';
