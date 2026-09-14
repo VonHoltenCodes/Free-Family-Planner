@@ -4,6 +4,7 @@
  * Only works while includes/auth_config.php does not exist; after that, use ⚙ Setup → Access.
  */
 require_once __DIR__ . '/api/_access.php';
+require_once __DIR__ . '/includes/fp_session.php';
 if (fp_auth_exists()) { header('Location: auth.php'); exit; }
 $error = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -16,8 +17,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             fp_auth_write(['FP_USERNAME' => $u, 'FP_PASSWORD_HASH' => password_hash($p, PASSWORD_DEFAULT), 'FP_TITLE' => strtoupper(trim($_POST['title'] ?? '')) ?: 'FAMILY', 'FP_SUBTITLE' => 'PLANNER']);
             // sign the creator in and hand off to the app (the ⚙ wizard opens on a fresh install)
             define('FP_AUTH', true); require_once fp_auth_file();
-            ini_set('session.cookie_httponly', 1); ini_set('session.use_only_cookies', 1); ini_set('session.cookie_samesite', 'Strict');
-            session_name(FP_SESSION_NAME); session_set_cookie_params(FP_SESSION_LIFETIME); session_start(); session_regenerate_id(true);
+            fp_session_start(); session_regenerate_id(true);
             $_SESSION['fp_authenticated'] = true; $_SESSION['fp_user'] = $u; $_SESSION['fp_login_time'] = time();
             header('Location: index.php'); exit;
         } catch (Exception $e) { $error = $e->getMessage(); }

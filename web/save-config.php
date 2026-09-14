@@ -7,13 +7,9 @@
 
 if (!defined('FP_AUTH')) define('FP_AUTH', true);
 require_once __DIR__ . '/includes/auth_config.php';
+require_once __DIR__ . '/includes/fp_session.php';
 
-ini_set('session.cookie_httponly', 1);
-ini_set('session.use_only_cookies', 1);
-ini_set('session.cookie_samesite', 'Strict');
-session_name(FP_SESSION_NAME);
-session_set_cookie_params(FP_SESSION_LIFETIME);
-session_start();
+fp_session_start();
 
 header('Content-Type: application/json');
 header('Cache-Control: no-store');

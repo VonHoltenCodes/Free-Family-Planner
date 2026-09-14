@@ -9,13 +9,13 @@ if (!defined('FP_AUTH')) define('FP_AUTH', true);
 require_once __DIR__ . '/_access.php';
 if (!fp_auth_exists()) { header('Content-Type: application/json'); http_response_code(409); echo json_encode(['error' => 'no login yet — open setup-login.php in a browser first']); exit; }
 require_once __DIR__ . '/../includes/auth_config.php';
+require_once __DIR__ . '/../includes/fp_session.php';
 header('Content-Type: application/json'); header('Cache-Control: no-store');
 $tok = defined('FP_API_TOKEN') ? FP_API_TOKEN : '';
 $hdr = $_SERVER['HTTP_AUTHORIZATION'] ?? ($_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? '');
 $byToken = $tok !== '' && (hash_equals("Bearer $tok", $hdr) || (isset($_GET['token']) && hash_equals($tok, (string)$_GET['token'])));
 if (!$byToken) {
-    ini_set('session.cookie_httponly', 1); ini_set('session.use_only_cookies', 1); ini_set('session.cookie_samesite', 'Strict');
-    session_name(FP_SESSION_NAME); session_set_cookie_params(FP_SESSION_LIFETIME); session_start();
+    fp_session_start();
     if (!isset($_SESSION['fp_authenticated']) || $_SESSION['fp_authenticated'] !== true) { http_response_code(401); echo json_encode(['error' => 'sign in, or send Authorization: Bearer <FP_API_TOKEN>']); exit; }
 }
 $out = function ($code, $o) { http_response_code($code); echo json_encode($o, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE); exit; };
