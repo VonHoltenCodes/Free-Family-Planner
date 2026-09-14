@@ -27,14 +27,14 @@ $body = in_array($m, ['POST', 'PUT', 'PATCH'], true) ? (json_decode(file_get_con
 try {
     $d = g_read();
     if ($op === 'status') {
-        $out(200, ['connected' => !empty($d['refresh_token']), 'configured' => !empty($d['client_id']), 'clientId' => $d['client_id'] ?? '',
+        $out(200, ['connected' => !empty($d['refresh_token']), 'configured' => !empty($d['client_id']), 'hasSecret' => !empty($d['client_secret']), 'clientId' => $d['client_id'] ?? '',
             'email' => $d['email'] ?? '', 'lastRefresh' => $d['last_refresh'] ?? null, 'lastError' => $d['last_error'] ?? null,
             'redirectUri' => g_redirect_uri(), 'accessValidFor' => max(0, (int)(($d['expires_at'] ?? 0) - time()))]);
     }
     if ($op === 'configure' && $m === 'POST') {
         $id = trim($body['clientId'] ?? ''); $secret = trim($body['clientSecret'] ?? '');
         if (!preg_match('/\.apps\.googleusercontent\.com$/', $id)) $out(400, ['error' => 'that does not look like a Google OAuth client ID']);
-        if ($secret === '' && empty($d['client_secret'])) $out(400, ['error' => 'a client secret is required']);
+        if ($secret === '' && empty($d['client_secret'])) $out(400, ['error' => 'paste the client secret from the Google console — nothing is saved on this server yet']);
         $d['client_id'] = $id; if ($secret !== '') $d['client_secret'] = $secret;
         unset($d['access_token'], $d['expires_at']); g_write($d);
         $out(200, ['ok' => true, 'redirectUri' => g_redirect_uri()]);

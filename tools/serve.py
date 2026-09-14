@@ -255,13 +255,13 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                 except ApiError: pass
                 self.send_response(302); self.send_header('Location', '/?setup=calendars'); self.end_headers(); return None
             if op == 'status':
-                return self._json(200, {'connected': bool(d.get('refresh_token')), 'configured': bool(d.get('client_id')), 'clientId': d.get('client_id', ''),
+                return self._json(200, {'connected': bool(d.get('refresh_token')), 'configured': bool(d.get('client_id')), 'hasSecret': bool(d.get('client_secret')), 'clientId': d.get('client_id', ''),
                                         'email': d.get('email', ''), 'lastRefresh': d.get('last_refresh'), 'lastError': d.get('last_error'),
                                         'redirectUri': redirect_uri, 'accessValidFor': max(0, int(d.get('expires_at', 0) - time.time()))})
             if op == 'configure' and m == 'POST':
                 cid = (body.get('clientId') or '').strip(); sec = (body.get('clientSecret') or '').strip()
                 if not cid.endswith('.apps.googleusercontent.com'): raise ApiError(400, 'that does not look like a Google OAuth client ID')
-                if not sec and not d.get('client_secret'): raise ApiError(400, 'a client secret is required')
+                if not sec and not d.get('client_secret'): raise ApiError(400, 'paste the client secret from the Google console — nothing is saved on this server yet')
                 d['client_id'] = cid
                 if sec: d['client_secret'] = sec
                 d.pop('access_token', None); d.pop('expires_at', None); g_write(d)

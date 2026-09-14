@@ -167,7 +167,7 @@ export function openSetup(current, { firstRun = false, step: startStep = 0 } = {
       serverBox.appendChild(el('small', 'hint', 'The server keeps the Google connection, so the wall never asks anyone to sign in, it survives reloads, and it works from any address. You connect once, here.'));
       const gStatus = el('div', 'test-out'); serverBox.appendChild(el('div', 'test-row')).appendChild(gStatus);
       const gId = text(gmode.clientId || draft.googleClientId || '', '1234567890-abc.apps.googleusercontent.com', (v) => { gmode.clientId = v.trim(); });
-      const gSecret = el('input'); gSecret.type = 'password'; gSecret.placeholder = 'client secret (blank = keep the saved one)'; gSecret.autocomplete = 'off';
+      const gSecret = el('input'); gSecret.type = 'password'; gSecret.placeholder = 'client secret — paste it here'; gSecret.autocomplete = 'off';
       serverBox.append(field('OAuth client ID', gId), field('Client secret', gSecret, 'Google Cloud Console → Credentials → your OAuth 2.0 Web client → it has a secret. Stored on the server only.'));
       const redir = el('div', 'preview'); redir.hidden = true; serverBox.appendChild(redir);
       const saveRow = el('div', 'test-row'); const saveBtn = el('button', 'btn sm', 'Save client details'); saveBtn.type = 'button';
@@ -180,6 +180,7 @@ export function openSetup(current, { firstRun = false, step: startStep = 0 } = {
           : (s.configured ? 'client details saved — now press Connect Google' : 'not connected');
         if (s.lastError && !s.connected) { gStatus.textContent += ` · last error: ${s.lastError}`; }
         discBtn.hidden = !s.connected; connectBtn.textContent = s.connected ? 'Reconnect Google →' : 'Connect Google →';
+        gSecret.placeholder = s.hasSecret ? 'client secret — leave blank to keep the saved one' : 'client secret — paste it here (required)';
         redir.hidden = false; redir.textContent = `Add this exact URL to your OAuth client's "Authorised redirect URIs" in the Google console:\n${s.redirectUri}`;
       };
       GServer.status().then(showStatus).catch((e) => { gStatus.className = 'test-out bad'; gStatus.textContent = `server-side Google unavailable here: ${e.message}`; connectBtn.disabled = true; saveBtn.disabled = true; });
