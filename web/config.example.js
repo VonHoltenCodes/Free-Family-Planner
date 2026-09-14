@@ -26,7 +26,13 @@ export default {
   firebase: {
     apiKey: '', authDomain: '', projectId: '', storageBucket: '', messagingSenderId: '', appId: '',
   },
-  // Google Cloud OAuth 2.0 Web client ID with the Calendar API enabled and your site as an authorized origin.
+  // Google Calendar. Two ways:
+  //   google: { mode: 'server' } — the SERVER holds the OAuth refresh token (wizard → Calendars →
+  //     Connect). Best for a wall display: it never asks anyone to sign in, survives reloads, and
+  //     works from any address. Needs a client secret, kept on the server, never in this file.
+  //   google: { mode: 'browser' } + googleClientId — the in-page sign-in; needs someone to tap it
+  //     again when the token lapses, and Google only accepts localhost or https origins.
+  google: { mode: 'none' },
   googleClientId: '',
   holidayCalendarId: 'en.usa#holiday@group.v.calendar.google.com',
   // Calendars shown together on the grid. Google (above) is added automatically when signed in.

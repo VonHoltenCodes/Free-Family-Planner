@@ -24,7 +24,7 @@ $body = in_array($m, ['POST', 'PUT', 'PATCH'], true) ? json_decode(file_get_cont
 if (in_array($m, ['POST', 'PUT', 'PATCH'], true) && !is_array($body)) $body = [];
 $dir = __DIR__ . '/../includes/data'; if (!is_dir($dir)) @mkdir($dir, 0750, true);
 $ROUTES = ['GET /api/v1', 'GET|PUT|PATCH /api/v1/access', 'GET|PUT|PATCH /api/v1/config', 'GET|PUT|POST /api/v1/tiles, DELETE /api/v1/tiles/{entity}', 'GET|PUT|PATCH /api/v1/hub', 'GET /api/v1/hub/test', 'GET /api/v1/hub/entities[?domain=]', 'GET /api/v1/hub/states?ids=a,b', 'POST /api/v1/hub/call {entity,action}', 'GET /api/v1/hub/calendars', 'GET|POST|PATCH|DELETE /api/v1/hub/todo', 'GET|POST /api/v1/lists/{shopping|notes}, PATCH|DELETE /api/v1/lists/{col}/{id}', 'GET|PUT|PATCH /api/v1/meals', 'GET /api/v1/chores, GET|PUT /api/v1/chores/{kid}', 'GET|POST /api/v1/events, PUT|PATCH|DELETE /api/v1/events/{id}', 'GET /api/v1/state', 'GET /api/v1/power'];
-$CONFIG_KEYS = ['family', 'location', 'firebase', 'googleClientId', 'holidayCalendarId', 'backend', 'calendars', 'weather', 'house', 'defaultMode', 'defaultTab', 'power'];
+$CONFIG_KEYS = ['family', 'location', 'firebase', 'googleClientId', 'holidayCalendarId', 'backend', 'calendars', 'weather', 'house', 'defaultMode', 'defaultTab', 'power', 'google'];
 
 // ---- helpers ----
 function cfg_read() { $s = @file_get_contents(__DIR__ . '/../config.js'); if ($s && preg_match('/export default (\{.*\});/s', $s, $mm)) { $c = json_decode($mm[1], true); if (is_array($c)) return $c; } return []; }

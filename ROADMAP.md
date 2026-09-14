@@ -13,6 +13,7 @@ still gets a `feat/<name>` branch and a PR.
 | **Electricity prices** ✅ | `main` | ComEd Hourly Pricing panel: live ¢/kWh, day-ahead hours today + tomorrow, SPIKE warnings (strip, banner, header pill), published to `/api/state`. Other utilities' hourly feeds can slot in behind the same panel. |
 | **API + CLI** ✅ | `feat/api-v1` | `/api/v1` on both servers (config, tiles, hub, lists, meals, chores, events, state, power) with LAN-open or bearer-token auth, and `tools/ffp`, a stdlib CLI that drives all of it. |
 | **Screen care & watchdog** ✅ | `feat/kiosk-health` | Screensaver (drift / bounce / stars / black), pixel shift, night dim; heartbeat watchdog with sleep-aware stale detection, loop-safe self-reload, nightly refresh, WeatherStar recycle; health telemetry in `/api/state`. |
+| **Server-held Google connection** ✅ | `feat/google-server` | The server keeps the OAuth refresh token and mints access tokens (`api/google.php`, mirrored in `tools/serve.py`): the display never signs in, survives reloads, and works from any address. The in-browser flow remains an option. |
 
 ## Shipped in v0.1.0
 
