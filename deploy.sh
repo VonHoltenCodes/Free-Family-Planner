@@ -15,7 +15,9 @@ STAGE="${STAGE:-/tmp/family-planner-stage}"
 # Stage locally and stamp every module import + asset reference with the commit version so the wall
 # display never mixes cached old modules with new ones (internal imports have no query string in git).
 LOCAL_STAGE="$(mktemp -d)"
-rsync -a --exclude 'includes/' "$HERE/web/" "$LOCAL_STAGE/"
+# Ship everything except the two things that belong to the server alone: the login config and the
+# private data directory (sessions, hub token, sync store). Other files under includes/ are ours.
+rsync -a --exclude 'includes/auth_config.php' --exclude 'includes/data/' "$HERE/web/" "$LOCAL_STAGE/"
 V="$(git -C "$HERE" rev-parse --short HEAD 2>/dev/null || date +%s)"
 find "$LOCAL_STAGE/assets/js" -name '*.js' -exec sed -i -E "s#(from '\./[a-z0-9_./-]+\.js)(\?v=[0-9]+)?'#\1?v=$V'#g; s#(import\('\./[a-z0-9_./-]+\.js)(\?v=[0-9]+)?'#\1?v=$V'#g; s#(from '\.\./\.\./config\.js)#\1#g" {} +
 sed -i -E "s#(assets/(css|js)/[a-z-]+\.(css|js))(\?v=[0-9]+)?#\1?v=$V#g" "$LOCAL_STAGE/app.html"
@@ -24,11 +26,11 @@ rm -rf "$LOCAL_STAGE"
 if [ -n "${SUDO_PASS:-}" ]; then
   printf '%s\n' "$SUDO_PASS" | ssh "$SSH_HOST" "sudo -S -p '' bash -c '
     set -e
-    rsync -a --delete --exclude includes/ $STAGE/ $DEST/
+    rsync -a --delete --exclude includes/auth_config.php --exclude includes/data/ $STAGE/ $DEST/
     chown -R $WEB_USER:$WEB_USER $DEST
     find $DEST -type d -exec chmod 755 {} +; find $DEST -type f -exec chmod 644 {} +
     rm -rf $STAGE'"
 else
-  ssh "$SSH_HOST" "rsync -a --delete --exclude includes/ $STAGE/ $DEST/ && rm -rf $STAGE"
+  ssh "$SSH_HOST" "rsync -a --delete --exclude includes/auth_config.php --exclude includes/data/ $STAGE/ $DEST/ && rm -rf $STAGE"
 fi
 echo "deployed → ${SITE_URL:-$DEST}"
