@@ -5,9 +5,9 @@
 
 define('FP_AUTH', true);
 require_once __DIR__ . '/includes/auth_config.php';
+require_once __DIR__ . '/includes/fp_session.php';
 
-session_name(FP_SESSION_NAME);
-session_start();
+fp_session_start();
 
 // Clear all session data
 $_SESSION = array();
