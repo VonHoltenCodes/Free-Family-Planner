@@ -155,8 +155,11 @@ export function openSetup(current, { firstRun = false, step: startStep = 0 } = {
         haSect.appendChild(el('small', 'hint', 'Calendars your hub knows (Google, iCloud, CalDAV, local — whatever you connected in Home Assistant). Shown read-only; events are fetched through your server.')); }); }).catch(() => {});
       // google
       body.appendChild(el('div', 'sect', 'Google Calendar (read/write)'));
+      body.appendChild(el('small', 'hint', 'To link Google: leave this on “On the server”, paste the client secret under the client ID, then press “Connect Google →”. You will be sent to Google once to approve, and the display never has to sign in again.'));
       const gwrap = el('div'); body.appendChild(gwrap);
-      const gmode = draft.google = { mode: draft.google?.mode || (draft.googleClientId ? 'browser' : 'none'), ...(draft.google || {}) };
+      // default to the recommended server flow until someone has actually chosen; the runtime keeps
+      // using whatever config.google.mode says, so this only decides what the wizard shows first
+      const gmode = draft.google = { ...(draft.google || {}), mode: draft.google?.mode && draft.google.mode !== 'none' ? draft.google.mode : 'server' };
       body.appendChild(opt2('How to connect', [['none', 'Not now'], ['server', 'On the server (recommended)'], ['browser', 'In this browser']], gmode.mode, (v) => { gmode.mode = v; paintG(); }));
       const serverBox = el('div'); const browserBox = el('div'); gwrap.append(serverBox, browserBox);
 
