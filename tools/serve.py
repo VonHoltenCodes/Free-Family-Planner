@@ -10,7 +10,8 @@ Note: Google's OAuth only accepts http://localhost or an https:// origin as an a
 JavaScript origin, so for Calendar sign-in open the page on the device itself via localhost,
 or put a LAN hostname behind https. Firestore, WeatherStar and NWS work from any origin.
 """
-import argparse, functools, http.server, json, os, re, shutil, sys, threading, webbrowser
+import argparse, functools, http.server, json, os, re, shutil, sys, threading, time, webbrowser
+import urllib.parse, urllib.error
 from urllib.parse import urlsplit, parse_qs
 import urllib.request
 
@@ -19,6 +20,11 @@ DATA_DIR = os.environ.get('FP_DATA_DIR') or os.path.join(os.path.dirname(os.path
 DB_FILE = os.path.join(DATA_DIR, 'planner.json')
 STATE_FILE = os.path.join(DATA_DIR, 'state.json')
 HUB_FILE = os.path.join(DATA_DIR, 'hub.json')
+GOOGLE_FILE = os.path.join(DATA_DIR, 'google.json')
+G_AUTH = os.environ.get('FP_GOOGLE_AUTH_URL', 'https://accounts.google.com/o/oauth2/v2/auth')
+G_TOKEN = os.environ.get('FP_GOOGLE_TOKEN_URL', 'https://oauth2.googleapis.com/token')
+G_API = os.environ.get('FP_GOOGLE_API_BASE', 'https://www.googleapis.com/calendar/v3')
+G_SCOPE = 'https://www.googleapis.com/auth/calendar'
 API_TOKEN_FILE = os.path.join(DATA_DIR, 'api-token')   # optional: if present, /api/v1 requires 'Authorization: Bearer <token>'
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import hub_adapter  # noqa: E402
@@ -62,7 +68,7 @@ V1_ROUTES = ['GET /api/v1', 'GET|PUT|PATCH /api/v1/access', 'GET|PUT|PATCH /api/
              'GET|PUT|PATCH /api/v1/hub', 'GET /api/v1/hub/test', 'GET /api/v1/hub/entities[?domain=]', 'GET /api/v1/hub/states?ids=a,b', 'POST /api/v1/hub/call {entity,action}',
              'GET /api/v1/hub/calendars', 'GET|POST|PATCH|DELETE /api/v1/hub/todo', 'GET|POST /api/v1/lists/{shopping|notes}, PATCH|DELETE /api/v1/lists/{col}/{id}',
              'GET|PUT|PATCH /api/v1/meals', 'GET /api/v1/chores, GET|PUT /api/v1/chores/{kid}', 'GET|POST /api/v1/events, PUT|PATCH|DELETE /api/v1/events/{id}', 'GET /api/v1/state', 'GET /api/v1/power']
-CONFIG_KEYS = ('family', 'location', 'firebase', 'googleClientId', 'holidayCalendarId', 'backend', 'calendars', 'weather', 'house', 'defaultMode', 'defaultTab', 'power')
+CONFIG_KEYS = ('family', 'location', 'firebase', 'googleClientId', 'holidayCalendarId', 'backend', 'calendars', 'weather', 'house', 'defaultMode', 'defaultTab', 'power', 'google')
 def now_iso():
     import datetime as dt; return dt.datetime.now(dt.timezone.utc).isoformat().replace('+00:00', 'Z')
 def new_id():
@@ -83,6 +89,56 @@ def hub_read():
     try:
         with open(HUB_FILE) as f: return json.load(f)
     except (OSError, ValueError): return {}
+def g_read():
+    try:
+        with open(GOOGLE_FILE) as f: return json.load(f)
+    except (OSError, ValueError): return {}
+def g_write(d):
+    os.makedirs(DATA_DIR, exist_ok=True)
+    with open(GOOGLE_FILE, 'w') as f: json.dump(d, f)
+    try: os.chmod(GOOGLE_FILE, 0o600)
+    except OSError: pass
+def g_form(url, fields):
+    body = urllib.parse.urlencode(fields).encode()
+    req = urllib.request.Request(url, data=body, headers={'Content-Type': 'application/x-www-form-urlencoded', 'Accept': 'application/json'})
+    try:
+        with urllib.request.urlopen(req, timeout=20) as r: return json.loads(r.read() or b'{}')
+    except urllib.error.HTTPError as e:
+        raw = e.read().decode(errors='replace')
+        try: j = json.loads(raw); msg = j.get('error_description') or j.get('error') or raw[:200]
+        except ValueError: msg = raw[:200]
+        raise ApiError(502, f'Google: {msg}')
+    except Exception as e: raise ApiError(502, f'Google unreachable: {e}')  # noqa: BLE001
+def g_token():
+    d = g_read()
+    if not d.get('refresh_token'): raise ApiError(409, 'Google is not connected on this server')
+    if d.get('access_token') and d.get('expires_at', 0) > time.time() + 60: return d['access_token']
+    r = g_form(G_TOKEN, {'client_id': d.get('client_id', ''), 'client_secret': d.get('client_secret', ''), 'refresh_token': d['refresh_token'], 'grant_type': 'refresh_token'})
+    if not r.get('access_token'): raise ApiError(502, 'Google returned no access token')
+    d['access_token'] = r['access_token']; d['expires_at'] = time.time() + int(r.get('expires_in', 3600))
+    if r.get('refresh_token'): d['refresh_token'] = r['refresh_token']
+    d['last_refresh'] = dt_now(); d.pop('last_error', None); g_write(d); return d['access_token']
+def g_api(method, path, body=None, query=None, _retried=False):
+    url = G_API + path + ('?' + urllib.parse.urlencode(query) if query else '')
+    data = json.dumps(body).encode() if body is not None else None
+    req = urllib.request.Request(url, data=data, method=method, headers={'Authorization': f'Bearer {g_token()}', 'Accept': 'application/json', **({'Content-Type': 'application/json'} if data else {})})
+    try:
+        with urllib.request.urlopen(req, timeout=20) as r: raw = r.read(); return json.loads(raw) if raw else {}
+    except urllib.error.HTTPError as e:
+        if e.code == 401 and not _retried:
+            d = g_read(); d.pop('access_token', None); d.pop('expires_at', None); g_write(d)
+            return g_api(method, path, body, query, True)
+        raw = e.read().decode(errors='replace')
+        try: msg = json.loads(raw)['error']['message']
+        except Exception: msg = raw[:200]  # noqa: BLE001
+        raise ApiError(502, f'Google: {msg}')
+def g_window():
+    import datetime as dt
+    a = dt.datetime.now(dt.timezone.utc) - dt.timedelta(days=31); b = dt.datetime.now(dt.timezone.utc) + dt.timedelta(days=93)
+    return {'timeMin': a.isoformat().replace('+00:00', 'Z'), 'timeMax': b.isoformat().replace('+00:00', 'Z')}
+def dt_now():
+    import datetime as dt; return dt.datetime.now(dt.timezone.utc).isoformat().replace('+00:00', 'Z')
+
 def hub_write(h):
     os.makedirs(DATA_DIR, exist_ok=True)
     with open(HUB_FILE, 'w') as f: json.dump(h, f)
@@ -120,6 +176,15 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                       '.js': 'text/javascript', '.mjs': 'text/javascript', '.woff': 'font/woff',
                       '.ttf': 'font/ttf', '.svg': 'image/svg+xml', '.json': 'application/json',
                       '.webp': 'image/webp'}
+    def _body(self):
+        """Request body as a dict. `int('0') or b'{}'` used to reach rfile.read(b'{}') and blow up
+        on any POST without a body, so the length is handled explicitly."""
+        try: n = int(self.headers.get('Content-Length', '0') or 0)
+        except ValueError: n = 0
+        raw = self.rfile.read(n) if n > 0 else b''
+        if not raw: return {}
+        return json.loads(raw)
+
     def _json(self, code, obj):
         body = json.dumps(obj).encode(); self.send_response(code)
         self.send_header('Content-Type', 'application/json'); self.send_header('Content-Length', str(len(body))); self.end_headers(); self.wfile.write(body)
@@ -134,7 +199,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             c, i = q.get('c', ''), q.get('id', '')
             if c not in COLLECTIONS or not re.fullmatch(r'[A-Za-z0-9_.-]{1,64}', i): return self._json(400, {'error': 'bad request'})
             if self.command == 'PUT':
-                try: doc = json.loads(self.rfile.read(int(self.headers.get('Content-Length', '0')) or b'{}'))
+                try: doc = self._body()
                 except ValueError: return self._json(400, {'error': 'bad body'})
                 db['data'].setdefault(c, {})[i] = doc
             elif self.command == 'DELETE': db['data'].get(c, {}).pop(i, None)
@@ -146,7 +211,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         without a snapshot we derive what we can from the sync store."""
         if self.command == 'PUT':
             try:
-                snap = json.loads(self.rfile.read(int(self.headers.get('Content-Length', '0')) or b'{}'))
+                snap = self._body()
                 if not isinstance(snap, dict) or 'meals' not in snap: raise ValueError('bad snapshot')
             except ValueError as e: return self._json(400, {'error': str(e)})
             os.makedirs(DATA_DIR, exist_ok=True)
@@ -159,12 +224,80 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         self.send_response(200); self.send_header('Content-Type', 'application/json'); self.send_header('Access-Control-Allow-Origin', '*')
         body = json.dumps(snap).encode(); self.send_header('Content-Length', str(len(body))); self.end_headers(); self.wfile.write(body)
 
+    def _google(self):
+        """Server-side Google Calendar — same ops as web/api/google.php (docs/api.md)."""
+        u = urlsplit(self.path); q = {k: v[0] for k, v in parse_qs(u.query).items()}; op = q.get('op', 'status'); m = self.command
+        host = self.headers.get('Host') or '127.0.0.1'
+        redirect_uri = f'http://{host}/api/google-callback.php'
+        body = {}
+        if m in ('POST', 'PUT', 'PATCH'):
+            try: body = self._body()
+            except ValueError: return self._json(400, {'error': 'body must be JSON'})
+        d = g_read()
+        try:
+            if u.path.endswith('google-callback.php'):
+                def fail(why):
+                    d2 = g_read()
+                    if d2: d2['last_error'] = f'{why} @ {dt_now()}'; g_write(d2)
+                    page = f'<!doctype html><meta charset="utf-8"><body style="font-family:system-ui;background:#14141a;color:#d6dbe6;padding:40px"><h2 style="color:#ff3b2e">Google connection failed</h2><p>{why}</p><p><a style="color:#2bd0ff" href="/?setup=calendars">Back to the planner</a></p>'.encode()
+                    self.send_response(200); self.send_header('Content-Type', 'text/html; charset=utf-8'); self.send_header('Content-Length', str(len(page))); self.end_headers(); self.wfile.write(page); return None
+                if q.get('error'): return fail(f"Google said: {q['error']}")
+                if not q.get('code'): return fail('no authorization code came back')
+                if not d.get('state') or q.get('state') != d.get('state'): return fail('the request did not match this server — start again from ⚙ Setup → Calendars')
+                d.pop('state', None)
+                r = g_form(G_TOKEN, {'code': q['code'], 'client_id': d.get('client_id', ''), 'client_secret': d.get('client_secret', ''), 'redirect_uri': redirect_uri, 'grant_type': 'authorization_code'})
+                if not r.get('refresh_token'): return fail('Google did not return a refresh token. Remove this app at myaccount.google.com/permissions and connect again.')
+                d.update({'refresh_token': r['refresh_token'], 'access_token': r.get('access_token'), 'expires_at': time.time() + int(r.get('expires_in', 3600)), 'connected_at': dt_now(), 'last_refresh': dt_now()})
+                d.pop('last_error', None); g_write(d)
+                try:
+                    for c in g_api('GET', '/users/me/calendarList', query={'maxResults': 5}).get('items', []):
+                        if c.get('primary'): d['email'] = c['id']; g_write(d)
+                except ApiError: pass
+                self.send_response(302); self.send_header('Location', '/?setup=calendars'); self.end_headers(); return None
+            if op == 'status':
+                return self._json(200, {'connected': bool(d.get('refresh_token')), 'configured': bool(d.get('client_id')), 'clientId': d.get('client_id', ''),
+                                        'email': d.get('email', ''), 'lastRefresh': d.get('last_refresh'), 'lastError': d.get('last_error'),
+                                        'redirectUri': redirect_uri, 'accessValidFor': max(0, int(d.get('expires_at', 0) - time.time()))})
+            if op == 'configure' and m == 'POST':
+                cid = (body.get('clientId') or '').strip(); sec = (body.get('clientSecret') or '').strip()
+                if not cid.endswith('.apps.googleusercontent.com'): raise ApiError(400, 'that does not look like a Google OAuth client ID')
+                if not sec and not d.get('client_secret'): raise ApiError(400, 'a client secret is required')
+                d['client_id'] = cid
+                if sec: d['client_secret'] = sec
+                d.pop('access_token', None); d.pop('expires_at', None); g_write(d)
+                return self._json(200, {'ok': True, 'redirectUri': redirect_uri})
+            if op == 'authurl':
+                if not d.get('client_id') or not d.get('client_secret'): raise ApiError(409, 'set the client ID and secret first')
+                import secrets as _s; d['state'] = _s.token_hex(16); g_write(d)
+                url = G_AUTH + '?' + urllib.parse.urlencode({'client_id': d['client_id'], 'redirect_uri': redirect_uri, 'response_type': 'code',
+                    'scope': G_SCOPE, 'access_type': 'offline', 'prompt': 'consent', 'include_granted_scopes': 'true', 'state': d['state']})
+                if q.get('go'): self.send_response(302); self.send_header('Location', url); self.end_headers(); return None
+                return self._json(200, {'url': url})
+            if op == 'disconnect' and m == 'POST':
+                g_write({'client_id': d.get('client_id', ''), 'client_secret': d.get('client_secret', '')}); return self._json(200, {'ok': True})
+            if op == 'calendars':
+                items = g_api('GET', '/users/me/calendarList', query={'maxResults': 250}).get('items', [])
+                return self._json(200, {'calendars': [{'id': c['id'], 'name': c.get('summary', c['id']), 'primary': bool(c.get('primary'))} for c in items]})
+            if op == 'events':
+                cal = q.get('calendarId') or d.get('calendar_id') or 'primary'
+                query = {**g_window(), 'singleEvents': 'true', 'orderBy': 'startTime', 'maxResults': 250, 'showDeleted': 'false'}
+                for k in ('timeMin', 'timeMax'):
+                    if q.get(k): query[k] = q[k]
+                return self._json(200, {'events': g_api('GET', f"/calendars/{urllib.parse.quote(cal, safe='')}/events", query=query).get('items', [])})
+            if op == 'insert' and m == 'POST': return self._json(200, g_api('POST', f"/calendars/{urllib.parse.quote(body.get('calendarId', 'primary'), safe='')}/events", body.get('resource', {})))
+            if op == 'update' and m == 'POST': return self._json(200, g_api('PUT', f"/calendars/{urllib.parse.quote(body.get('calendarId', 'primary'), safe='')}/events/{urllib.parse.quote(body.get('eventId', ''), safe='')}", body.get('resource', {})))
+            if op == 'delete' and m == 'POST': g_api('DELETE', f"/calendars/{urllib.parse.quote(body.get('calendarId', 'primary'), safe='')}/events/{urllib.parse.quote(body.get('eventId', ''), safe='')}"); return self._json(200, {'ok': True})
+            raise ApiError(400, 'unknown op')
+        except ApiError as e:
+            if d: d['last_error'] = f'{e} @ {dt_now()}'; g_write(d)
+            return self._json(e.code, {'error': str(e)})
+
     def _hub(self):
         """Home hub proxy — same ops as web/api/hub.php. The hub URL/token stay in data/hub.json."""
         q = {k: v[0] for k, v in parse_qs(urlsplit(self.path).query).items()}; op = q.get('op', '')
         body = {}
         if self.command == 'POST':
-            try: body = json.loads(self.rfile.read(int(self.headers.get('Content-Length', '0')) or b'{}'))
+            try: body = self._body()
             except ValueError: return self._json(400, {'error': 'bad body'})
         try:
             with open(HUB_FILE) as f: hub = json.load(f)
@@ -208,7 +341,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         u = urlsplit(self.path); parts = [p for p in u.path.split('/')[3:] if p]; q = {k: v[0] for k, v in parse_qs(u.query).items()}; m = self.command
         body = {}
         if m in ('POST', 'PUT', 'PATCH'):
-            try: body = json.loads(self.rfile.read(int(self.headers.get('Content-Length', '0')) or b'{}'))
+            try: body = self._body()
             except ValueError: return self._json(400, {'error': 'body must be JSON'})
         try: return self._v1_route(parts, m, q, body)
         except hub_adapter.HubError as e: return self._json(502, {'error': str(e)})
@@ -340,6 +473,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
 
     def do_GET(self):
         if self.path.startswith('/api/v1'): return self._v1()
+        if self.path.startswith('/api/google'): return self._google()
         if self.path.startswith('/api/db.php'): return self._db()
         if self.path.startswith('/api/ics.php'): return self._ics_proxy()
         if self.path.split('?')[0] in ('/api/state', '/api/state.php'): return self._state()
@@ -349,19 +483,20 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             except Exception as e: return self._json(502, {'error': str(e)})  # noqa: BLE001
         if self.path.split('?')[0] in ('/', '/index.php', '/index.html'):
             self.path = '/app.html'
-        if self.path.startswith('/includes/') or (self.path.startswith('/api/') and not self.path.startswith('/api/v1') and not self.path.split('?')[0] in ('/api/state', '/api/state.php', '/api/power', '/api/power.php')):
+        if self.path.startswith('/includes/') or (self.path.startswith('/api/') and not self.path.startswith('/api/v1') and not self.path.startswith('/api/google') and not self.path.split('?')[0] in ('/api/state', '/api/state.php', '/api/power', '/api/power.php')):
             self.send_error(403); return
         return super().do_GET()
     def do_POST(self):
         if self.path.startswith('/api/v1'): return self._v1()
+        if self.path.startswith('/api/google'): return self._google()
         if self.path.startswith('/api/hub.php'): return self._hub()
         # the ⚙ setup wizard posts the config here (same path as the hosted PHP endpoint)
         if self.path.split('?')[0] not in ('/save-config.php', '/save-config'):
             self.send_error(404); return
         try:
-            n = int(self.headers.get('Content-Length', '0')); cfg = json.loads(self.rfile.read(n) or b'{}')
+            cfg = self._body()
             if not isinstance(cfg, dict) or 'family' not in cfg or 'location' not in cfg: raise ValueError('invalid config')
-            clean = {k: cfg[k] for k in ('family', 'location', 'firebase', 'googleClientId', 'holidayCalendarId', 'backend', 'calendars', 'weather', 'house', 'defaultMode', 'defaultTab', 'power') if k in cfg}
+            clean = {k: cfg[k] for k in ('family', 'location', 'firebase', 'googleClientId', 'holidayCalendarId', 'backend', 'calendars', 'weather', 'house', 'defaultMode', 'defaultTab', 'power', 'google') if k in cfg}
             target = os.path.join(ROOT, 'config.js')
             if os.path.exists(target): shutil.copy(target, target + '.bak')
             with open(target, 'w') as f:

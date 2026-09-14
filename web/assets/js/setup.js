@@ -6,6 +6,7 @@ import { testFirebase, testSync } from './store.js';
 import { lookupPoint, WS_SCREENS } from './wx.js';
 import { openMeteoConditions } from './wx-card.js';
 import { hub, tileKind, controllable } from './hub.js';
+import { GServer } from './gserver.js';
 import { loadScript } from './gcal.js';
 
 const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
@@ -154,10 +155,50 @@ export function openSetup(current, { firstRun = false, step: startStep = 0 } = {
         haSect.appendChild(el('small', 'hint', 'Calendars your hub knows (Google, iCloud, CalDAV, local — whatever you connected in Home Assistant). Shown read-only; events are fetched through your server.')); }); }).catch(() => {});
       // google
       body.appendChild(el('div', 'sect', 'Google Calendar (read/write)'));
-      body.appendChild(field('OAuth client ID', text(draft.googleClientId, '1234567890-abc.apps.googleusercontent.com', (v) => { draft.googleClientId = v.trim(); }), 'Google Cloud Console → enable the Calendar API → OAuth 2.0 Web client → add this site\'s origin to Authorized JavaScript origins. Leave blank to skip Google.'));
+      const gwrap = el('div'); body.appendChild(gwrap);
+      const gmode = draft.google = { mode: draft.google?.mode || (draft.googleClientId ? 'browser' : 'none'), ...(draft.google || {}) };
+      body.appendChild(opt2('How to connect', [['none', 'Not now'], ['server', 'On the server (recommended)'], ['browser', 'In this browser']], gmode.mode, (v) => { gmode.mode = v; paintG(); }));
+      const serverBox = el('div'); const browserBox = el('div'); gwrap.append(serverBox, browserBox);
+
+      // --- server-held connection: the display never signs in ---
+      serverBox.appendChild(el('small', 'hint', 'The server keeps the Google connection, so the wall never asks anyone to sign in, it survives reloads, and it works from any address. You connect once, here.'));
+      const gStatus = el('div', 'test-out'); serverBox.appendChild(el('div', 'test-row')).appendChild(gStatus);
+      const gId = text(gmode.clientId || draft.googleClientId || '', '1234567890-abc.apps.googleusercontent.com', (v) => { gmode.clientId = v.trim(); });
+      const gSecret = el('input'); gSecret.type = 'password'; gSecret.placeholder = 'client secret (blank = keep the saved one)'; gSecret.autocomplete = 'off';
+      serverBox.append(field('OAuth client ID', gId), field('Client secret', gSecret, 'Google Cloud Console → Credentials → your OAuth 2.0 Web client → it has a secret. Stored on the server only.'));
+      const redir = el('div', 'preview'); redir.hidden = true; serverBox.appendChild(redir);
+      const saveRow = el('div', 'test-row'); const saveBtn = el('button', 'btn sm', 'Save client details'); saveBtn.type = 'button';
+      const connectBtn = el('button', 'btn sm on', 'Connect Google →'); connectBtn.type = 'button';
+      const discBtn = el('button', 'btn sm danger', 'Disconnect'); discBtn.type = 'button'; discBtn.hidden = true;
+      const saveOut = el('span', 'test-out'); saveRow.append(saveBtn, connectBtn, discBtn, saveOut); serverBox.appendChild(saveRow);
+      const showStatus = (s) => {
+        gStatus.className = 'test-out ' + (s.connected ? 'ok' : (s.configured ? '' : 'bad'));
+        gStatus.textContent = s.connected ? `✓ connected${s.email ? ` as ${s.email}` : ''}${s.lastRefresh ? ` · token refreshed ${new Date(s.lastRefresh).toLocaleString()}` : ''}`
+          : (s.configured ? 'client details saved — now press Connect Google' : 'not connected');
+        if (s.lastError && !s.connected) { gStatus.textContent += ` · last error: ${s.lastError}`; }
+        discBtn.hidden = !s.connected; connectBtn.textContent = s.connected ? 'Reconnect Google →' : 'Connect Google →';
+        redir.hidden = false; redir.textContent = `Add this exact URL to your OAuth client's "Authorised redirect URIs" in the Google console:\n${s.redirectUri}`;
+      };
+      GServer.status().then(showStatus).catch((e) => { gStatus.className = 'test-out bad'; gStatus.textContent = `server-side Google unavailable here: ${e.message}`; connectBtn.disabled = true; saveBtn.disabled = true; });
+      saveBtn.addEventListener('click', async () => { saveOut.className = 'test-out'; saveOut.textContent = 'saving…';
+        try { await GServer.configure(gId.value.trim(), gSecret.value); gSecret.value = ''; saveOut.className = 'test-out ok'; saveOut.textContent = '✓ saved'; showStatus(await GServer.status()); }
+        catch (e) { saveOut.className = 'test-out bad'; saveOut.textContent = `✗ ${e.message}`; } });
+      connectBtn.addEventListener('click', async () => {
+        try { await GServer.configure(gId.value.trim(), gSecret.value); } catch (e) { saveOut.className = 'test-out bad'; saveOut.textContent = `✗ ${e.message}`; return; }
+        gmode.mode = 'server'; draft.googleClientId = ''; gmode.clientId = gId.value.trim();
+        try { await fetch('save-config.php', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(exportable()) }); } catch { /* the consent matters more */ }
+        location.href = GServer.connectUrl();     // off to Google, back to api/google-callback.php
+      });
+      discBtn.addEventListener('click', async () => { try { await GServer.disconnect(); showStatus(await GServer.status()); } catch (e) { saveOut.className = 'test-out bad'; saveOut.textContent = `✗ ${e.message}`; } });
+
+      // --- in-browser sign-in (the original flow) ---
+      browserBox.appendChild(field('OAuth client ID', text(draft.googleClientId, '1234567890-abc.apps.googleusercontent.com', (v) => { draft.googleClientId = v.trim(); }), 'Google Cloud Console → enable the Calendar API → OAuth 2.0 Web client → add this site\'s origin to Authorized JavaScript origins.'));
+      browserBox.appendChild(el('small', 'hint', `This page's origin: ${location.origin}${location.origin.startsWith('http://') && !/localhost|127\.0\.0\.1/.test(location.origin) ? ' — Google only accepts http://localhost or https:// origins, so sign-in will not work from here.' : ''} Somebody has to tap "sign in" again whenever the token lapses.`));
+      browserBox.appendChild(testBtn('Check client ID', async () => { if (!/\.apps\.googleusercontent\.com$/.test(draft.googleClientId)) throw new Error('does not look like a Google OAuth client ID'); await loadScript('https://accounts.google.com/gsi/client'); return 'Google Identity loaded — sign in from the calendar panel after saving'; }));
+
       body.appendChild(field('Holiday calendar', text(draft.holidayCalendarId, DEFAULTS.holidayCalendarId, (v) => { draft.holidayCalendarId = v.trim(); }), 'any public Google calendar id; blank for none'));
-      body.appendChild(el('small', 'hint', `This page's origin: ${location.origin}${location.origin.startsWith('http://') && !/localhost|127\.0\.0\.1/.test(location.origin) ? ' — Google only accepts http://localhost or https:// origins, so sign-in will not work from here.' : ''}`));
-      body.appendChild(testBtn('Check client ID', async () => { if (!/\.apps\.googleusercontent\.com$/.test(draft.googleClientId)) throw new Error('does not look like a Google OAuth client ID'); await loadScript('https://accounts.google.com/gsi/client'); return 'Google Identity loaded — sign in from the calendar panel after saving'; }));
+      const paintG = () => { serverBox.hidden = gmode.mode !== 'server'; browserBox.hidden = gmode.mode !== 'browser'; };
+      paintG();
     } else if (step === 5) {
       const wx = draft.weather = { provider: 'auto', screens: {}, speed: 1, scanLines: false, ...(draft.weather || {}) };
       body.appendChild(el('p', 'lead', 'The weather panel.'));

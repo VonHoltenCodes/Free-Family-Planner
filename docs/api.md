@@ -66,6 +66,23 @@ Keys and shapes are exactly those in [`web/config.example.js`](../web/config.exa
 | `GET /hub/calendars` | the hub's calendars |
 | `GET` / `POST {"text"}` / `PATCH {"uid","completed"}` / `DELETE {"uid"}` `/hub/todo` | the hub's shopping to-do list |
 
+### Google Calendar (server-held connection)
+Same routes on both servers, at `api/google.php` (not under `/api/v1`, because Google's redirect has
+to land on a plain path). Auth: the site login, or the API token.
+
+| | |
+|---|---|
+| `GET ?op=status` | `{connected, configured, clientId, email, lastRefresh, lastError, redirectUri, accessValidFor}` |
+| `POST ?op=configure` | `{clientId, clientSecret}` — the secret is stored server-side and never returned |
+| `GET ?op=authurl[&go=1]` | the Google consent URL, or a redirect straight to it |
+| `GET ?op=calendars` | the account's calendars |
+| `GET ?op=events[&calendarId=&timeMin=&timeMax=]` | events (defaults to a month back, three months ahead) |
+| `POST ?op=insert` \| `update` \| `delete` | `{calendarId, eventId?, resource?}` |
+| `POST ?op=disconnect` | forget the refresh token (the client details are kept) |
+
+`api/google-callback.php` is Google's redirect target; it swaps the code for a refresh token and
+returns to the planner. See [google-calendar.md](google-calendar.md).
+
 ### Data (self-hosted sync store)
 These read and write the server's own store, so they apply to installs whose data backend is
 **self-hosted** (`backend: "sync"`). Firestore-backed installs keep their data in Google's cloud;

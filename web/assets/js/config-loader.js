@@ -6,7 +6,8 @@ export const DEFAULTS = {
   location: { label: '', lat: null, lon: null },
   firebase: { apiKey: '', authDomain: '', projectId: '', storageBucket: '', messagingSenderId: '', appId: '' },
   backend: '',           // 'firestore' | 'sync' | 'local' — blank = firestore if configured, else local
-  googleClientId: '',
+  googleClientId: '',   // browser sign-in flow (legacy)
+  google: { mode: 'none' },   // 'server' = the server holds the OAuth refresh token (best for a wall display)
   holidayCalendarId: 'en.usa#holiday@group.v.calendar.google.com',
   calendars: [{ type: 'local', name: 'Family', color: '#2bff66' }],
   weather: { provider: 'auto', screens: {}, speed: 1, scanLines: false },

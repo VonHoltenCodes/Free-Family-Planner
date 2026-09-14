@@ -50,6 +50,9 @@ startWatchdog({ frame: $('wx-frame'), nightlyHour: display.nightlyReload, recycl
 stateSet('health', health());
 setInterval(() => stateSet('health', health()), 60_000);
 if (!isConfigured(config)) setTimeout(() => openSetup(config, { firstRun: true }), 600);
+{ const want = new URLSearchParams(location.search).get('setup');
+  const at = { family: 0, kids: 1, location: 2, data: 3, calendars: 4, weather: 5, hub: 6, access: 7 }[want];
+  if (at != null) setTimeout(() => openSetup(config, { step: at }), 500); }
 { const f = $('status-footer'); f.innerHTML = ''; (config.family.footer || []).forEach((t, i) => { if (i) f.appendChild(el('span', 'sep', '•')); f.appendChild(el('span', null, t)); }); }
 
 /* ---------- canvas scaler: design canvas fitted to any display ---------- */
@@ -421,13 +424,15 @@ let authMsg = null;   // set while Google is configured but not signed in
 function setAuthUI(signedIn, msg) {
   $('cal-signout').hidden = !signedIn; $('cal-refresh').hidden = false;
   if (signedIn || !cal.hasGoogle) { authMsg = null; }
-  else { authMsg = { text: 'Sign in to see your Google Calendar too', err: msg || '' }; led('led-gc', ''); }
+  else { authMsg = { text: cal.googleMode === 'server' ? 'Google is not connected on the server yet' : 'Sign in to see your Google Calendar too', err: msg || '' }; led('led-gc', ''); }
   setWriteUI(); loadEvents(false);
 }
 function renderAuthPrompt(list) {
   const g = el('div', 'gstate compact');
   g.appendChild(el('div', null, authMsg.text));
-  const b = el('button', 'btn sm', 'Sign in with Google'); b.type = 'button'; b.addEventListener('click', () => gcal.requestToken(false)); g.appendChild(b);
+  const server = cal.googleMode === 'server';
+  const b = el('button', 'btn sm', server ? 'Connect in ⚙ Setup' : 'Sign in with Google'); b.type = 'button';
+  b.addEventListener('click', () => (server ? openSetup(config, { step: 4 }) : gcal.requestToken(false))); g.appendChild(b);
   if (authMsg.err) g.appendChild(el('div', 'err', authMsg.err));
   list.appendChild(g);
 }
@@ -484,6 +489,15 @@ window.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('evt-ov
 renderAll();
 (async () => {
   if (!gcal) { setAuthUI(false); return; }
+  if (cal.googleMode === 'server') {          // the server holds the connection; nothing to sign in to here
+    try {
+      await gcal.init();
+      gcal.onAuthChange = (ok, err) => setAuthUI(ok, err || '');
+      setAuthUI(gcal.signedIn, gcal.signedIn ? '' : (gcal.status?.lastError || ''));
+      setInterval(() => gcal.init().catch((e) => noteError('gcal', `status: ${e.message}`)), 30 * 60 * 1000);
+    } catch (e) { noteError('gcal', `server status failed: ${e.message}`); setAuthUI(false, e.message); }
+    return;
+  }
   try {
     await gcal.init();
     gcal.onAuthChange = (ok, err) => { setAuthUI(ok, err ? 'Sign-in failed' : ''); };

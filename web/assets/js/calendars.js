@@ -2,6 +2,7 @@
 // (read-only, fetched through api/ics.php or directly when the host allows CORS), and a Local
 // family calendar stored in the active data backend (read/write). planner.js only talks to this.
 import { GCal } from './gcal.js';
+import { GServer } from './gserver.js';
 import { icsToEvents } from './ics.js';
 import * as store from './store.js';
 import { hub } from './hub.js';
@@ -18,7 +19,12 @@ export class Calendars {
     this.ics = list.filter((c) => c.type === 'ics' && c.url).map((c, i) => ({ id: `ics${i}`, name: c.name || `Feed ${i + 1}`, url: c.url, color: c.color || '#c98bdb' }));
     this.ha = list.filter((c) => c.type === 'ha' && c.entity).map((c) => ({ id: `ha:${c.entity}`, entity: c.entity, name: c.name || c.entity, color: c.color || '#7d9bff' }));
     this.local = list.find((c) => c.type === 'local') ? { id: 'local', name: list.find((c) => c.type === 'local').name || 'Family', color: list.find((c) => c.type === 'local').color || '#2bff66' } : null;
-    this.google = config.googleClientId ? new GCal({ clientId: config.googleClientId, holidayCalendarId: config.holidayCalendarId }) : null;
+    // 'server' keeps the OAuth connection on the server (right for a display nobody signs in at);
+    // 'browser' is the original in-page flow.
+    const gmode = config.google?.mode || (config.googleClientId ? 'browser' : 'none');
+    this.googleMode = gmode;
+    this.google = gmode === 'server' ? new GServer({ holidayCalendarId: config.holidayCalendarId })
+      : (gmode === 'browser' && config.googleClientId ? new GCal({ clientId: config.googleClientId, holidayCalendarId: config.holidayCalendarId }) : null);
     this.localEvents = []; this.icsCache = {}; this.onLocalChange = () => {};
     if (this.local && store.configured) store.watchEvents((items) => { this.localEvents = items; this.onLocalChange(); }, (e) => console.warn('local calendar:', e.message));
   }
