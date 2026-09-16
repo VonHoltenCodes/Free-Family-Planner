@@ -6,7 +6,9 @@ let timer = null; let lastSent = 0; let enabled = true;
 const FULL = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
 export const stateSnapshot = snap;
+/* A value, or a function called at publish time when the value must be current (health). */
 export function stateSet(key, value) { snap[key] = value; schedule(3000); }
+const live = (v) => (typeof v === 'function' ? v() : v);
 function schedule(ms) { if (!enabled) return; clearTimeout(timer); timer = setTimeout(publish, ms); }
 
 function build() {
@@ -19,9 +21,9 @@ function build() {
     meals: { today: snap.meals?.[today] || '', todayName: today, week: Object.fromEntries(FULL.map((d) => [d, snap.meals?.[d] || ''])) },
     shopping: list(snap.shopping || []), notes: list(snap.notes || []),
     chores: Object.fromEntries(Object.entries(snap.chores || {}).map(([id, k]) => [id, { name: k.name, done: k.items.filter((c) => c.completed && c.text).length, total: k.items.filter((c) => c.text).length, items: k.items.filter((c) => c.text).map((c) => ({ text: c.text, completed: !!c.completed })) }])),
-    events: evs, weather: snap.weather, power: snap.power,
-    display: snap.display,   // viewport diagnostics from the wall (helps support layout issues)
-    health: snap.health,     // uptime, heartbeats, recent errors (see watchdog.js)
+    events: evs, weather: live(snap.weather), power: live(snap.power),
+    display: live(snap.display),   // viewport diagnostics from the wall (helps support layout issues)
+    health: live(snap.health),   // uptime, heartbeats, recent errors (see watchdog.js) — read fresh at publish time
   };
 }
 async function publish() {

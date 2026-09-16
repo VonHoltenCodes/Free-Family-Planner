@@ -136,16 +136,27 @@ A wall display is on all day for years, so the app looks after the panel and aft
 - **Pixel shift** nudges the whole layout a couple of pixels every few minutes so panel edges and the
   clock never sit on the same pixels for weeks.
 - **Night dim** on a schedule (below), which also cuts wear.
-- **A watchdog** keeps a heartbeat on the clock, the calendar, the weather and the lists. A stale feed
-  is flagged; a genuinely wedged page reloads itself (and never loops — three reloads in half an hour
-  and it stops and keeps the evidence instead). A sleeping device is told apart from a wedged one.
+- **A watchdog** keeps a heartbeat on the clock, the calendar, the weather and the lists.
+  - A feed silent for **two hours** gets the page reloaded, because a display showing yesterday's
+    weather is the "it froze" everyone actually means.
+  - The clock going quiet means the page itself is wedged: reload at once.
+  - Reloading **escalates and verifies** — `location.reload()` has been observed doing nothing at all
+    on a tablet that had been up for a day, so it tries harder and records it if the page is still
+    running 90 seconds later.
+  - Three reloads in half an hour and it stops, keeping the evidence: a reload loop is worse than a freeze.
+  - A sleeping device is told apart from a wedged one, and when it wakes the page **pulls everything
+    fresh** instead of waiting out the intervals.
+  - It holds a **screen wake lock** where the browser allows one, since a tablet that dozes stops
+    fetching and looks frozen when you walk past it.
 - **Nightly refresh** in a quiet hour, and the bundled WeatherStar app is recycled every six hours —
   browsers left running for days get slow, and this clears it before anyone is up.
 - What it learns (uptime, heartbeats, memory, recent errors, why it last reloaded) rides along in
   `/api/state`, so a freeze can be diagnosed after the fact: `ffp state | jq .health`.
 
-If the browser itself hangs hard, no in-page watchdog can help — use a kiosk browser with its own
-reload schedule (Fully Kiosk can reload on a timer) as a belt-and-braces backstop.
+**None of this can save a browser that hangs hard**, because the page's own code stops running with
+it. For an unattended display, pair this with a kiosk browser that watches from outside: Fully Kiosk's
+*Keep screen on*, *Reload on network reconnect*, *Restart app on crash* and a nightly *Scheduled
+reload* between them cover the cases the page cannot. See [docs/kiosk/](docs/kiosk/README.md).
 
 ## Display settings
 The **☰ Display** button (status bar) opens per-screen settings saved in that browser: show/hide
