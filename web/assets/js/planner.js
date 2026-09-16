@@ -46,9 +46,18 @@ const saver = startScreensaver(display, () => {
   return { line: next ? `${next.key === todayKey ? 'Today' : new Date(next.key + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long' })} — ${next.ev.summary || ''}` : '',
            sub: [$('hdr-temp').textContent !== '--' ? `${$('hdr-temp').textContent}°${display.units === 'metric' ? 'C' : 'F'} ${$('hdr-cond').textContent}` : '', p ? `${p}¢/kWh` : ''].filter(Boolean).join('  ·  ') };
 });
-startWatchdog({ frame: $('wx-frame'), nightlyHour: display.nightlyReload, recycleHours: 6, onStatus: (s, why) => { if (why) console.warn('watchdog:', why); } });
-stateSet('health', health());
-setInterval(() => stateSet('health', health()), 60_000);
+function catchUp(why) {
+  // after a sleep or a tab switch, pull everything fresh rather than waiting out the intervals
+  noteError('info', `catching up${why ? ` after ${why}s asleep` : ''}`);
+  tickClock();
+  if (config.location.lat != null) refreshWx();
+  loadEvents(false);
+  dimTick();
+}
+startWatchdog({ frame: $('wx-frame'), nightlyHour: display.nightlyReload, recycleHours: 6,
+  onStatus: (s, why) => { if (why) console.warn('watchdog:', why); },
+  onResume: (secs) => catchUp(secs) });
+stateSet('health', health);   // the function, so every snapshot carries current numbers
 if (!isConfigured(config)) setTimeout(() => openSetup(config, { firstRun: true }), 600);
 { const want = new URLSearchParams(location.search).get('setup');
   const at = { family: 0, kids: 1, location: 2, data: 3, calendars: 4, weather: 5, hub: 6, access: 7 }[want];
