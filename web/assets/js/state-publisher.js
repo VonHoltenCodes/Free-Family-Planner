@@ -1,3 +1,4 @@
+import { sessionLost } from './session.js';
 // Publishes a small read-only snapshot of what the wall shows to the server (PUT api/state.php),
 // so home hubs (Home Assistant's REST sensor, Home-IO) can read "tonight's dinner", open shopping
 // items, chores done, next events and the outside temperature without any integration to install.
@@ -31,6 +32,7 @@ async function publish() {
   try {
     const r = await fetch('api/state.php', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(build()), cache: 'no-store' });
     if (r.status === 404 || r.status === 405) { enabled = false; return; }   // static host: nothing to publish to
+    if (r.status === 401) { sessionLost('state'); return; }                   // our own login is gone
     lastSent = Date.now();
   } catch (e) { console.warn('state publish:', e.message); }
 }
