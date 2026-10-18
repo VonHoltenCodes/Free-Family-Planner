@@ -6,16 +6,41 @@
  * Debian/Ubuntu disable PHP's own collector in favour of a system timer that deletes anything older
  * than that from /var/lib/php/sessions. With `session.lazy_write` on, an idle-but-alive wall display
  * never touches its session file, so the sweeper removed it every half hour: the display's API calls
- * started answering 401 and the next tap landed on the sign-in page. A "7 day" cookie made no
- * difference because the server had already thrown the session away.
+ * started answering 401 and the next tap landed on the sign-in page. So the planner keeps sessions in
+ * its own private directory, sets the lifetime to match the cookie, touches the file on every request,
+ * and collects its own leftovers.
  *
- * So the planner keeps sessions in its own private directory, sets the lifetime to match the cookie,
- * touches the file on every request, and collects its own leftovers.
+ * One cookie for the whole app. Scripts live in the app root and in api/; an earlier version issued
+ * the cookie with the path of whichever directory answered, so a browser ended up holding two cookies
+ * of the same name. When the session later expired and the person signed in again, only the root one
+ * was renewed. Browsers send the more specific path first and PHP keeps the first, so every API call
+ * presented the dead ID and answered 401 while the page itself loaded fine — for a month. Now the
+ * path is always the app root, a duplicate is resolved in favour of the root cookie, and the stray is
+ * expired on the spot.
  */
 if (!function_exists('fp_session_start')) {
+/** The URL path of the app root, whichever script is answering (api/*.php and rewrites included). */
+function fp_cookie_path() {
+    if (defined('FP_COOKIE_PATH')) return FP_COOKIE_PATH;
+    // Best: the app root on disk, relative to the document root — immune to rewrites and routers.
+    $root = realpath(dirname(__DIR__)); $doc = realpath($_SERVER['DOCUMENT_ROOT'] ?? '');
+    if ($root && $doc && strpos($root, $doc) === 0) {
+        $rel = str_replace('\\', '/', substr($root, strlen($doc)));
+        return $rel === '' ? '/' : $rel;
+    }
+    // Fallback (aliases, odd hosts): strip the script directories we know about.
+    $dir = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? '/')), '/');
+    while (in_array(basename($dir), ['api', 'v1'], true)) $dir = rtrim(dirname($dir), '/');
+    return ($dir === '' || $dir === '.') ? '/' : $dir;
+}
 function fp_session_start() {
     if (session_status() === PHP_SESSION_ACTIVE) return;
     $life = defined('FP_SESSION_LIFETIME') ? (int)FP_SESSION_LIFETIME : 604800;
+    $name = defined('FP_SESSION_NAME') ? FP_SESSION_NAME : 'fp_session';
+    $path = fp_cookie_path();
+    $secure = !empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off';
+    $opts = ['path' => $path, 'secure' => $secure, 'httponly' => true, 'samesite' => 'Lax'];
+
     $dir = __DIR__ . '/data/sessions';
     if (!is_dir($dir)) @mkdir($dir, 0700, true);
     if (is_dir($dir) && is_writable($dir)) {
@@ -28,14 +53,31 @@ function fp_session_start() {
     ini_set('session.cookie_samesite', 'Lax');      // Lax so a redirect back from an OAuth consent keeps the session
     ini_set('session.use_strict_mode', '1');
     if (!headers_sent()) {
-        session_name(defined('FP_SESSION_NAME') ? FP_SESSION_NAME : 'fp_session');
-        session_set_cookie_params(['lifetime' => $life, 'path' => dirname($_SERVER['SCRIPT_NAME'] ?? '/') ?: '/', 'secure' => !empty($_SERVER['HTTPS']), 'httponly' => true, 'samesite' => 'Lax']);
+        session_name($name);
+        session_set_cookie_params($opts + ['lifetime' => $life]);
     }
+
+    // Two cookies of our name? Keep the app-root one (browsers send it last) and expire the stray.
+    $vals = [];
+    foreach (explode(';', $_SERVER['HTTP_COOKIE'] ?? '') as $c) {
+        $kv = explode('=', trim($c), 2);
+        if (count($kv) === 2 && trim($kv[0]) === $name) $vals[] = urldecode($kv[1]);
+    }
+    if (count($vals) > 1) {
+        session_id(end($vals));
+        // expire the stray wherever an older build could have put it: this script's own directory,
+        // and the api/ directory (the rewrite for api/v1 reports an odd SCRIPT_NAME on some hosts)
+        $here = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? '/')), '/') ?: '/';
+        foreach (array_unique([$here, rtrim($path, '/') . '/api']) as $stray) {
+            if ($stray !== $path && !headers_sent()) setcookie($name, '', ['expires' => time() - 86400, 'path' => $stray] + $opts);
+        }
+    }
+
     session_start();
     // keep the file young: lazy_write skips untouched sessions, and a stale mtime is what got them swept
     $_SESSION['fp_seen'] = time();
     if (!empty($_SESSION['fp_authenticated']) && !headers_sent()) {
-        setcookie(session_name(), session_id(), ['expires' => time() + $life, 'path' => dirname($_SERVER['SCRIPT_NAME'] ?? '/') ?: '/', 'secure' => !empty($_SERVER['HTTPS']), 'httponly' => true, 'samesite' => 'Lax']);
+        setcookie($name, session_id(), ['expires' => time() + $life] + $opts);
     }
     fp_session_gc($life);
 }

@@ -10,6 +10,7 @@ import { hub, mountHouse, startTodoSync } from './hub.js';
 import { mountPower } from './power.js';
 import { startWatchdog, beat, health, noteError } from './watchdog.js';
 import { startPixelShift, startScreensaver } from './screensaver.js';
+import { sessionLost } from './session.js';
 import { loadDisplay, applyLayout, applyTheme, startDim, openDisplaySettings, setPanelAvailable, currentScreen, defaultTab, SCREENS, PANELS } from './display.js';
 
 const config = await loadConfig();
@@ -188,7 +189,7 @@ if (config.power?.provider === 'comed') {
 /* ---------- home hub: House panel + shopping-list sync ---------- */
 (async () => {
   let st = null;
-  try { st = await hub.status(); } catch (e) { return; }   // static host / no endpoint: feature off
+  try { st = await hub.status(); } catch (e) { if (e.status === 401 || /\b401\b/.test(e.message)) sessionLost('hub', { toast }); return; }   // static host / no endpoint: feature off
   if (!st || st.type === 'none') return;
   $('svc-hub').hidden = false; $('led-hub-label').textContent = st.type === 'homeio' ? 'HOME-IO' : 'HOME ASSISTANT';
   const tiles = config.house?.tiles || [];
@@ -446,8 +447,8 @@ function renderAuthPrompt(list) {
   const g = el('div', 'gstate compact');
   g.appendChild(el('div', null, authMsg.text));
   const server = cal.googleMode === 'server';
-  const b = el('button', 'btn sm', server ? 'Connect in ⚙ Setup' : 'Sign in with Google'); b.type = 'button';
-  b.addEventListener('click', () => (server ? openSetup(config, { step: 4 }) : gcal.requestToken(false))); g.appendChild(b);
+  const b = el('button', 'btn sm', authMsg.login ? 'Sign in' : (server ? 'Connect in ⚙ Setup' : 'Sign in with Google')); b.type = 'button';
+  b.addEventListener('click', () => (authMsg.login ? location.replace('auth.php') : server ? openSetup(config, { step: 4 }) : gcal.requestToken(false))); g.appendChild(b);
   if (authMsg.err) g.appendChild(el('div', 'err', authMsg.err));
   list.appendChild(g);
 }
@@ -512,7 +513,14 @@ renderAll();
       gcal.onAuthChange = (ok, err) => setAuthUI(ok, err || '');
       setAuthUI(gcal.signedIn, gcal.signedIn ? '' : (gcal.status?.lastError || ''));
       setInterval(() => gcal.init().catch((e) => noteError('gcal', `status: ${e.message}`)), 30 * 60 * 1000);
-    } catch (e) { noteError('gcal', `server status failed: ${e.message}`); setAuthUI(false, e.message); }
+    } catch (e) {
+      noteError('gcal', `server status failed: ${e.status || ''} ${e.message}`);
+      if (e.status === 401) {   // not Google's fault: the planner sign-in itself is gone
+        authMsg = { text: 'Signed out of the planner', err: 'the page can no longer reach its own server — sign in again', login: true };
+        led('led-gc', 'warn'); setWriteUI(); loadEvents(false); sessionLost('google status', { toast }); return;
+      }
+      setAuthUI(false, e.message);
+    }
     return;
   }
   try {
