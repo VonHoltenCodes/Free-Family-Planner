@@ -22,7 +22,7 @@ export class Calendars {
     // 'server' keeps the OAuth connection on the server (right for a display nobody signs in at);
     // 'browser' is the original in-page flow.
     const gmode = config.google?.mode || (config.googleClientId ? 'browser' : 'none');
-    this.googleMode = gmode;
+    this.googleMode = gmode; this.holidayCalendarId = config.holidayCalendarId; this.googleOverride = null;
     this.google = gmode === 'server' ? new GServer({ holidayCalendarId: config.holidayCalendarId })
       : (gmode === 'browser' && config.googleClientId ? new GCal({ clientId: config.googleClientId, holidayCalendarId: config.holidayCalendarId }) : null);
     this.localEvents = []; this.icsCache = {}; this.onLocalChange = () => {};
@@ -30,6 +30,24 @@ export class Calendars {
   }
   get hasGoogle() { return !!this.google; }
   get googleSignedIn() { return !!this.google?.signedIn; }
+
+  /* Probed once at boot. If this install's server holds a Google connection, use it whatever the
+     config says: a stale config once left a wall display on the in-browser flow for a month while
+     the server sat connected and unused. The in-browser flow needs a person at the screen. */
+  async resolveGoogle() {
+    if (this.googleMode === 'server') return this.googleMode;
+    try {
+      const r = await fetch('api/google.php?op=status', { cache: 'no-store' });
+      if (!r.ok) return this.googleMode;
+      const s = await r.json();
+      if (s.connected) {
+        this.googleOverride = `config said google.mode "${this.googleMode}" but this server holds a Google connection — using it`;
+        this.googleMode = 'server';
+        this.google = new GServer({ holidayCalendarId: this.holidayCalendarId });
+      }
+    } catch { /* no server here (static hosting): keep what the config says */ }
+    return this.googleMode;
+  }
   /* writable targets for new events */
   writable() { const w = []; if (this.google?.signedIn) w.push({ id: 'google', name: 'Google Calendar' }); if (this.local && store.configured) w.push({ id: 'local', name: `${this.local.name} (local)` }); return w; }
 

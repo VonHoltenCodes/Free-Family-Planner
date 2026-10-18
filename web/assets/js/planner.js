@@ -58,6 +58,8 @@ startWatchdog({ frame: $('wx-frame'), nightlyHour: display.nightlyReload, recycl
   onStatus: (s, why) => { if (why) console.warn('watchdog:', why); },
   onResume: (secs) => catchUp(secs) });
 stateSet('health', health);   // the function, so every snapshot carries current numbers
+const build = (document.querySelector('script[src*="planner.js"]')?.src.match(/[?&]v=([^&]+)/) || [])[1] || 'dev';
+stateSet('runtime', () => ({ build, googleMode: cal.googleMode, googleOverride: cal.googleOverride || null, configSource: config.__source, droppedOverlay: !!config.__droppedOverlay }));
 if (!isConfigured(config)) setTimeout(() => openSetup(config, { firstRun: true }), 600);
 { const want = new URLSearchParams(location.search).get('setup');
   const at = { family: 0, kids: 1, location: 2, data: 3, calendars: 4, weather: 5, hub: 6, access: 7 }[want];
@@ -290,7 +292,7 @@ const choresState = {}; const stateSnapshotChores = () => choresState;
 
 /* ---------- calendar ---------- */
 const cal = new Calendars(config);
-const gcal = cal.google;   // null when Google is not configured
+let gcal = cal.google;   // null when Google is not configured; re-resolved at boot (server connection wins)
 let events = [];      // normalised events from every provider (Google shape: start.date | start.dateTime)
 let holidays = [];    // holiday events (read-only)
 let expanded = [];    // per-day rows {ev, key, isHoliday, multi}
@@ -386,12 +388,15 @@ function renderWeek() {
 }
 function renderAll() { renderMonth(); renderDay(); renderWeek(); }
 
+let autoRenewTried = false;   // in-browser Google: automatic token renewal happens at most once per page life
 async function loadEvents(showBusy = true, retry = true) {
   if (showBusy) $('cal-refresh').disabled = true;
   try {
     // Google access tokens last about an hour and nobody is standing at the wall to sign in again,
     // so renew silently before a load that needs it.
-    if (gcal?.needsRefresh()) { try { await gcal.refresh(); } catch (e) { noteError('gcal', `silent refresh failed: ${e.message}`); } }
+    // In-browser Google only: ONE automatic renewal per page life. Every attempt opens Google's own
+    // window, which on a tablet is a new tab laid over the planner — an hourly one looked like a freeze.
+    if (gcal?.needsRefresh() && !autoRenewTried) { autoRenewTried = true; try { await gcal.refresh(); } catch (e) { noteError('gcal', `silent refresh failed: ${e.message}`); } }
     if (gcal?.signedIn && !gcal.calendars.length) { await gcal.listCalendars(); renderCalSelect(); }
     const all = await cal.loadAll();
     events = all.filter((e) => !e.isHoliday); holidays = all.filter((e) => e.isHoliday); stateSet('events', events);
@@ -404,7 +409,8 @@ async function loadEvents(showBusy = true, retry = true) {
   } catch (e) {
     console.error('calendar load:', e); led('led-gc', 'err');
     noteError('gcal', `load failed: ${e.status || ''} ${e.message || e.result?.error?.message || ''}`.trim());
-    if (e.status === 401 && retry) {                       // token died mid-flight: renew quietly and try again
+    if (e.status === 401 && retry && (cal.googleMode === 'server' || !autoRenewTried)) {   // renew once and try again
+      autoRenewTried = true;
       try { await gcal.refresh(); $('cal-refresh').disabled = false; return loadEvents(false, false); }
       catch (err) { noteError('gcal', `re-auth failed: ${err.message}`); }
     }
@@ -497,6 +503,8 @@ window.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('evt-ov
 /* boot calendars */
 renderAll();
 (async () => {
+  await cal.resolveGoogle(); gcal = cal.google;          // a server-held connection wins over the config
+  if (cal.googleOverride) noteError('info', cal.googleOverride);
   if (!gcal) { setAuthUI(false); return; }
   if (cal.googleMode === 'server') {          // the server holds the connection; nothing to sign in to here
     try {
@@ -518,4 +526,4 @@ renderAll();
 })();
 onNewDay.push(() => { const n = new Date(); selected = n; viewYM = { y: n.getFullYear(), m: n.getMonth() }; renderAll(); });
 setInterval(() => loadEvents(false), 15 * 60 * 1000);   // keep the wall display fresh
-setInterval(() => { if (gcal?.needsRefresh()) gcal.refresh().catch((e) => noteError('gcal', `keep-alive refresh failed: ${e.message}`)); }, 10 * 60 * 1000);
+// (no timed token renewal: in-browser Google renews once per page life, server-held Google renews itself)

@@ -82,7 +82,7 @@ def config_read():
     except (OSError, ValueError): return {}
 def config_write(cfg):
     if not isinstance(cfg, dict): raise ApiError(400, 'config must be a JSON object')
-    clean = {k: cfg[k] for k in CONFIG_KEYS if k in cfg}; target = os.path.join(ROOT, 'config.js')
+    clean = {k: cfg[k] for k in CONFIG_KEYS if k in cfg}; clean['savedAt'] = dt_now(); target = os.path.join(ROOT, 'config.js')
     if os.path.exists(target): shutil.copy(target, target + '.bak')
     with open(target, 'w') as f: f.write('// Free Family Planner — site config (written via the API)\nexport default ' + json.dumps(clean, indent=2) + ';\n')
 def hub_read():
@@ -497,6 +497,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             cfg = self._body()
             if not isinstance(cfg, dict) or 'family' not in cfg or 'location' not in cfg: raise ValueError('invalid config')
             clean = {k: cfg[k] for k in ('family', 'location', 'firebase', 'googleClientId', 'holidayCalendarId', 'backend', 'calendars', 'weather', 'house', 'defaultMode', 'defaultTab', 'power', 'google') if k in cfg}
+            clean['savedAt'] = dt_now()   # lets the page tell a stale browser copy from a newer server one
             target = os.path.join(ROOT, 'config.js')
             if os.path.exists(target): shutil.copy(target, target + '.bak')
             with open(target, 'w') as f:
