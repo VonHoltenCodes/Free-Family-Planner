@@ -109,6 +109,9 @@ Upload the `web/` folder to your host, or use the rsync helper:
 cp deploy.env.example deploy.env && $EDITOR deploy.env
 ./deploy.sh
 ```
+`deploy.sh` copies `web/config.js` to the server only when the server has none yet. From then on the
+server's copy is the live one (it is what the ⚙ setup wizard saves) and deploys leave it alone, as they
+do `includes/auth_config.php` and `includes/data/`.
 Open the URL, sign in, then on the wall device open the page and tap the ⛶ button for
 fullscreen. A kiosk browser on Android/Fire tablets works well; the login cookie lasts 7 days.
 
