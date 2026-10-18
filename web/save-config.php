@@ -30,6 +30,7 @@ if (!is_array($cfg) || !isset($cfg['family']) || !isset($cfg['location'])) {
 $allowed = ['family', 'location', 'firebase', 'googleClientId', 'holidayCalendarId', 'backend', 'calendars', 'weather', 'house', 'defaultMode', 'defaultTab', 'power', 'google'];
 $clean = [];
 foreach ($allowed as $k) { if (array_key_exists($k, $cfg)) $clean[$k] = $cfg[$k]; }
+$clean['savedAt'] = gmdate('c');   // lets the page tell a stale browser copy from a newer server one
 
 $target = __DIR__ . '/config.js';
 $src = "// Free Family Planner — site config (written by the ⚙ setup wizard " . date('c') . ")\n"

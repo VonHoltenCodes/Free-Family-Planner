@@ -28,7 +28,7 @@ $CONFIG_KEYS = ['family', 'location', 'firebase', 'googleClientId', 'holidayCale
 
 // ---- helpers ----
 function cfg_read() { $s = @file_get_contents(__DIR__ . '/../config.js'); if ($s && preg_match('/export default (\{.*\});/s', $s, $mm)) { $c = json_decode($mm[1], true); if (is_array($c)) return $c; } return []; }
-function cfg_write($c) { global $CONFIG_KEYS; $clean = []; foreach ($CONFIG_KEYS as $k) if (array_key_exists($k, $c)) $clean[$k] = $c[$k]; $t = __DIR__ . '/../config.js'; if (file_exists($t)) @copy($t, "$t.bak");
+function cfg_write($c) { global $CONFIG_KEYS; $clean = []; foreach ($CONFIG_KEYS as $k) if (array_key_exists($k, $c)) $clean[$k] = $c[$k]; $clean['savedAt'] = gmdate('c'); $t = __DIR__ . '/../config.js'; if (file_exists($t)) @copy($t, "$t.bak");
     if (file_put_contents($t, "// Free Family Planner — site config (written via the API " . date('c') . ")\nexport default " . json_encode($clean, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . ";\n", LOCK_EX) === false) throw new Exception('config.js is not writable by the web server'); }
 function deep_merge($a, $b) { foreach ($b as $k => $v) $a[$k] = (is_array($v) && isset($a[$k]) && is_array($a[$k]) && array_keys($v) !== range(0, count($v) - 1)) ? deep_merge($a[$k], $v) : $v; return $a; }
 function hub_read() { global $dir; return is_file("$dir/hub.json") ? (json_decode(file_get_contents("$dir/hub.json"), true) ?: []) : []; }

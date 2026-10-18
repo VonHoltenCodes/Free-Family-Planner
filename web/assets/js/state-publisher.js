@@ -1,7 +1,7 @@
 // Publishes a small read-only snapshot of what the wall shows to the server (PUT api/state.php),
 // so home hubs (Home Assistant's REST sensor, Home-IO) can read "tonight's dinner", open shopping
 // items, chores done, next events and the outside temperature without any integration to install.
-const snap = { meals: {}, shopping: [], notes: [], chores: {}, events: [], weather: null, family: {}, power: null, health: null };
+const snap = { meals: {}, shopping: [], notes: [], chores: {}, events: [], weather: null, family: {}, power: null, health: null, runtime: null };
 let timer = null; let lastSent = 0; let enabled = true;
 const FULL = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
@@ -24,6 +24,7 @@ function build() {
     events: evs, weather: live(snap.weather), power: live(snap.power),
     display: live(snap.display),   // viewport diagnostics from the wall (helps support layout issues)
     health: live(snap.health),   // uptime, heartbeats, recent errors (see watchdog.js) — read fresh at publish time
+    runtime: live(snap.runtime), // build, which Google mode is live, where the config came from
   };
 }
 async function publish() {

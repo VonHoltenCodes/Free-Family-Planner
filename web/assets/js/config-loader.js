@@ -35,10 +35,22 @@ export async function loadConfig() {
   try { file = (await import(`../../config.js?_=${Math.floor(Date.now() / 60000)}`)).default || {}; source = 'config.js'; }
   catch (e) { console.warn('config.js not loaded (run the ⚙ setup wizard):', e.message); }
   let local = {};
-  try { local = JSON.parse(localStorage.getItem(LS_KEY) || 'null') || {}; if (Object.keys(local).length) source += '+localStorage'; } catch { /* ignore */ }
-  const cfg = deepMerge(DEFAULTS, file, local);
+  try { local = JSON.parse(localStorage.getItem(LS_KEY) || 'null') || {}; } catch { /* ignore */ }
+  // The browser copy exists for installs with nowhere to save: the wizard writes it when the server
+  // refused. It must never outrank a newer server copy — a stale one once put a wall display back on
+  // the in-browser Google flow for a month while the server sat connected and unused. Last writer
+  // wins (both sides stamp savedAt), a tie goes to the server, and a losing copy is removed so a
+  // later wizard save cannot merge it back in.
+  let overlay = {}; let dropped = false;
+  if (Object.keys(local).length) {
+    const fileAt = Date.parse(file.savedAt) || 0; const localAt = Date.parse(local.savedAt) || 0;
+    if (source === 'defaults' || localAt > fileAt) { overlay = local; source += '+localStorage'; }
+    else { dropped = true; try { localStorage.removeItem(LS_KEY); } catch { /* ignore */ } }
+  }
+  const cfg = deepMerge(DEFAULTS, file, overlay);
   cfg.__source = source;
   cfg.__hasFile = source.startsWith('config.js');
+  cfg.__droppedOverlay = dropped;
   return cfg;
 }
 

@@ -293,7 +293,7 @@ export function openSetup(current, { firstRun = false, step: startStep = 0 } = {
       throw new Error(`server said ${r.status}`);
     } catch (e) {
       console.warn('server save unavailable:', e.message);
-      localStorage.setItem(LS_KEY, JSON.stringify(cfg));
+      cfg.savedAt = new Date().toISOString(); localStorage.setItem(LS_KEY, JSON.stringify(cfg));
       note('kept in this browser (no server-side save here) — reloading', 'warn'); setTimeout(() => location.reload(), 1200);
     }
   });
