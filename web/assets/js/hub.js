@@ -9,7 +9,11 @@ async function api(op, params = {}, body) {
   const q = new URLSearchParams({ op, ...params }).toString();
   const r = await fetch(`api/hub.php?${q}`, { method: body ? 'POST' : 'GET', headers: body ? { 'Content-Type': 'application/json' } : {}, body: body ? JSON.stringify(body) : undefined, cache: 'no-store' });
   const j = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(j.error || `hub ${r.status}`);
+  if (!r.ok) {
+    const e = new Error(j.error || `hub ${r.status}`); e.status = r.status;
+    if (r.status === 401) document.dispatchEvent(new CustomEvent('fp:unauthorized', { detail: 'hub' }));   // our own login is gone
+    throw e;
+  }
   return j;
 }
 export const hub = {

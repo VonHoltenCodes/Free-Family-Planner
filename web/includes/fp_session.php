@@ -63,17 +63,18 @@ function fp_session_start() {
         $kv = explode('=', trim($c), 2);
         if (count($kv) === 2 && trim($kv[0]) === $name) $vals[] = urldecode($kv[1]);
     }
-    if (count($vals) > 1) {
-        session_id(end($vals));
-        // expire the stray wherever an older build could have put it: this script's own directory,
-        // and the api/ directory (the rewrite for api/v1 reports an odd SCRIPT_NAME on some hosts)
-        $here = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? '/')), '/') ?: '/';
-        foreach (array_unique([$here, rtrim($path, '/') . '/api']) as $stray) {
-            if ($stray !== $path && !headers_sent()) setcookie($name, '', ['expires' => time() - 86400, 'path' => $stray] + $opts);
-        }
-    }
+    if (count($vals) > 1) session_id(end($vals));
 
     session_start();
+    // Expire a stray cookie only now: session_start() discards any earlier Set-Cookie carrying the
+    // session's name when it sends its own, so one queued before it never reached the browser.
+    // Cover wherever an older build could have put it — this script's own directory and api/.
+    if (count($vals) > 1 && !headers_sent()) {
+        $here = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? '/')), '/') ?: '/';
+        foreach (array_unique([$here, rtrim($path, '/') . '/api']) as $stray) {
+            if ($stray !== $path) setcookie($name, '', ['expires' => time() - 86400, 'path' => $stray] + $opts);
+        }
+    }
     // keep the file young: lazy_write skips untouched sessions, and a stale mtime is what got them swept
     $_SESSION['fp_seen'] = time();
     if (!empty($_SESSION['fp_authenticated']) && !headers_sent()) {
