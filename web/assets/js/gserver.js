@@ -5,7 +5,11 @@ const api = async (op, { method = 'GET', body, params } = {}) => {
   const q = new URLSearchParams({ op, ...(params || {}) }).toString();
   const r = await fetch(`api/google.php?${q}`, { method, headers: body ? { 'Content-Type': 'application/json' } : {}, body: body ? JSON.stringify(body) : undefined, cache: 'no-store' });
   const j = await r.json().catch(() => ({}));
-  if (!r.ok) { const e = new Error(j.error || `google ${r.status}`); e.status = r.status; throw e; }
+  if (!r.ok) {
+    const e = new Error(j.error || `google ${r.status}`); e.status = r.status;
+    if (r.status === 401) document.dispatchEvent(new CustomEvent('fp:unauthorized', { detail: 'google' }));   // our own login is gone
+    throw e;
+  }
   return j;
 };
 

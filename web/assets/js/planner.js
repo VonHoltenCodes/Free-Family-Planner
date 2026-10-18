@@ -11,6 +11,8 @@ import { mountPower } from './power.js';
 import { startWatchdog, beat, health, noteError } from './watchdog.js';
 import { startPixelShift, startScreensaver } from './screensaver.js';
 import { sessionLost } from './session.js';
+// any module seeing a 401 from our own server says so; the hub polls every 15 s, so a lost sign-in is caught fast
+document.addEventListener('fp:unauthorized', (e) => sessionLost(e.detail, { toast }));
 import { loadDisplay, applyLayout, applyTheme, startDim, openDisplaySettings, setPanelAvailable, currentScreen, defaultTab, SCREENS, PANELS } from './display.js';
 
 const config = await loadConfig();
