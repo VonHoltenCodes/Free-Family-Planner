@@ -2,6 +2,7 @@
 web/ws4kp/
 # per-site secrets / personal config — never commit
 web/config.js
+web/config.js.bak
 web/includes/auth_config.php
 deploy.env
 # self-hosted sync store
