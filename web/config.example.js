@@ -32,6 +32,9 @@ export default {
   //     works from any address. Needs a client secret, kept on the server, never in this file.
   //   google: { mode: 'browser' } + googleClientId — the in-page sign-in; needs someone to tap it
   //     again when the token lapses, and Google only accepts localhost or https origins.
+  //   calendarId: which of the account's calendars the display shows by default (its id from
+  //     Google, e.g. 'abc123@group.calendar.google.com'; omit for the primary one). The picker in
+  //     the calendar header can change it, and that choice is remembered per display.
   google: { mode: 'none' },
   googleClientId: '',
   holidayCalendarId: 'en.usa#holiday@group.v.calendar.google.com',
