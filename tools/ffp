@@ -22,6 +22,7 @@ Examples:
   ffp access | access token [generate|remove] | access state-token | access set-login [user]   (set-login needs `ffp login`, not a token)
   ffp wall info | wall shot [file.png] | wall reload | wall restart | wall reboot | wall screen on|off
   ffp wall settings [match] | wall set <key> <value> | wall url <url> | wall cmd <command> [key=value ...]
+  ffp wall demo on|off   (the wall shows the planner's sample data — photos without your real calendar)
     (the wall display itself, through Fully Kiosk Browser's remote admin — docs/kiosk/android-tablet.md;
      set FFP_WALL_URL / FFP_WALL_PASSWORD or "wall": {"url": "http://<display>:2323", "password": …} in the config file)
 Every command prints JSON; add -q for a compact one-liner.
@@ -182,6 +183,8 @@ def main():
         if sub == 'shot': return show(w.shot(rest[1] if len(rest) > 1 else 'wall.png'))
         if sub == 'reload': return show(w.cmd('loadStartURL'))
         if sub == 'url': return show(w.cmd('loadURL', url=rest[1]))
+        if sub == 'demo':   # sample data on the wall (for photos) and back; the page drops the parameter itself
+            start = w.info()['startUrl']; return show(w.cmd('loadURL', url=start + ('&' if '?' in start else '?') + 'demo=' + ('1' if rest[1] == 'on' else '0')))
         if sub == 'restart': return show(w.cmd('restartApp'))
         if sub == 'reboot': return show(w.cmd('rebootDevice'))
         if sub == 'screen': return show(w.cmd('screenOn' if rest[1] == 'on' else 'screenOff'))

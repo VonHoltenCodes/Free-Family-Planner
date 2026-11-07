@@ -45,9 +45,14 @@ Everything runs in the browser. There are two ways to run it:
 - **This device only**: everything in the browser's storage. Zero setup, no sync.
 
 ### 2. Calendars
-Want something on the grid before you connect anything? Every install serves a **demo feed** of
-fictional family events at `demo/family-demo.ics` — add it as an ICS feed in the wizard (URL:
-your planner address + `/demo/family-demo.ics`). Handy for showcasing without exposing a real calendar.
+**Demo mode** — pick **Demo (sample data)** in the calendar header's picker and the whole planner
+switches to a fictional family: generated events around today's date, a shopping list, notes,
+meals and chores. Nothing real is read or written while it is on (Google and the home hub are left
+alone, edits live only until the next reload), so it is the way to take photos or screenshots of
+the app without showing your own data. Pick **← Back to my calendars** to return. The switch is
+per browser; `?demo=1` / `?demo=0` on the page address does the same, which lets a wall display
+be flipped remotely (`ffp wall demo on`). Every install also serves `demo/family-demo.ics`, a
+small fictional ICS feed, if you want a feed example for the wizard.
 
 The wizard's Calendars step: the local family calendar is on by default; add iCal/ICS feed URLs
 (iCloud public calendar, Google "secret address in iCal format", Outlook publish, school/sports

@@ -35,7 +35,7 @@ export class Calendars {
      config says: a stale config once left a wall display on the in-browser flow for a month while
      the server sat connected and unused. The in-browser flow needs a person at the screen. */
   async resolveGoogle() {
-    if (this.googleMode === 'server') return this.googleMode;
+    if (this.googleMode === 'server' || this.config.demo) return this.googleMode;
     try {
       const r = await fetch('api/google.php?op=status', { cache: 'no-store' });
       if (!r.ok) return this.googleMode;
@@ -83,7 +83,7 @@ export class Calendars {
     if (!/BEGIN:VCALENDAR/i.test(text)) throw new Error('not an ICS feed');
     this.icsCache[feed.id] = { t: Date.now(), text }; return text;
   }
-  fromLocal(e) { return { id: e.id, provider: 'local', readOnly: false, color: this.local.color, calendarName: this.local.name, summary: e.summary, location: e.location, description: e.description,
+  fromLocal(e) { return { id: e.id, provider: 'local', readOnly: !!e.isHoliday, isHoliday: !!e.isHoliday, color: this.local.color, calendarName: this.local.name, summary: e.summary, location: e.location, description: e.description,
     start: e.allDay ? { date: e.start } : { dateTime: e.start }, end: e.allDay ? { date: e.end } : { dateTime: e.end } }; }
   toLocal(resource) { return { summary: resource.summary, location: resource.location || '', description: resource.description || '', allDay: !!resource.start.date,
     start: resource.start.date || resource.start.dateTime, end: resource.end.date || resource.end.dateTime, updatedAt: new Date().toISOString() }; }
