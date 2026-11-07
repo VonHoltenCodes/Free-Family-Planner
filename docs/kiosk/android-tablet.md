@@ -28,6 +28,47 @@ it and nothing inside can recover. These four Fully Kiosk settings cover exactly
 | *Scheduled reload* (say 4 AM) | a belt-and-braces version of the planner's own nightly refresh |
 5. Mount it. Portrait or landscape — the layout follows the screen.
 
+**The exact Fully settings, by their internal names** (what the remote admin API and `ffp wall settings`
+show; the search box at the top of Fully's settings finds each one by its label):
+
+| Key | Value | Label in Fully |
+|---|---|---|
+| `startURL` | your planner URL | Start URL |
+| `kioskMode` | true | Enable Kiosk Mode (set a PIN too) |
+| `keepScreenOn` | true | Keep Screen On |
+| `launchOnBoot` | true | Launch on Boot |
+| `restartOnCrash` | true | Restart After Crash |
+| `timeToRestartUnresponsiveWebview` | 120 | Restart on Unresponsiveness (seconds) — the hung-renderer cure |
+| `reloadOnInternet` | true | Auto Reload on Internet Reconnect |
+| `reloadOnScreenOn` | true | Auto Reload on Screen On |
+| `showActionBar`, `showAddressBar` | false | Show Action Bar / Show Address Bar — otherwise they take the top of the screen |
+| `remoteAdmin`, `remoteAdminLan` | true | Remote Administration — see below |
+
+Kiosk mode, the restart options and remote admin are PLUS features: they run unlicensed for evaluation
+with a "Please Get a License" watermark over the page. The licence is a one-time purchase per device,
+bought inside the app (Settings → Get PLUS License).
+
+**Managing the display from a terminal.** With *Remote Administration* on and a password set, Fully
+answers REST calls on port 2323 and `ffp` wraps the useful ones. Put the display in `~/.config/ffp/config.json`:
+
+```json
+{ "url": "…", "token": "…", "wall": { "url": "http://192.168.1.50:2323", "password": "…" } }
+```
+
+```
+ffp wall info                  model, Android + WebView version, licence, kiosk state, current page
+ffp wall shot wall.png         screenshot of what is on the screen right now
+ffp wall reload                load the start URL again
+ffp wall restart | reboot      restart Fully / reboot the device (reboot needs root or device-owner)
+ffp wall screen on|off
+ffp wall settings [match]      every Fully setting, or those whose key contains `match`
+ffp wall set <key> <value>     change one (true/false picks the boolean setter)
+ffp wall cmd <command> [k=v…]  any other remote-admin command, e.g. `ffp wall cmd textToSpeech text=Dinner`
+```
+
+The planner's own health (`ffp state | jq .health`) tells you what the page thinks; `ffp wall` tells
+you what the device thinks. When the two disagree, the device is right.
+
 **Google Calendar + LAN hosting:** Google only accepts `http://localhost` or an `https://` origin for
 sign-in. On a LAN install without https, calendar sign-in from the tablet will be refused. Options:
 put the LAN server behind https (a reverse proxy with a local CA or a real domain), or use a hosted

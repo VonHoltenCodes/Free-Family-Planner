@@ -20,6 +20,10 @@ Examples:
   ffp events | events add "Dentist" 2026-09-10 [2026-09-11] [--all-day]
   ffp state | power | hub todo | hub todo add "Bread"
   ffp access | access token [generate|remove] | access state-token | access set-login [user]   (set-login needs `ffp login`, not a token)
+  ffp wall info | wall shot [file.png] | wall reload | wall restart | wall reboot | wall screen on|off
+  ffp wall settings [match] | wall set <key> <value> | wall url <url> | wall cmd <command> [key=value ...]
+    (the wall display itself, through Fully Kiosk Browser's remote admin — docs/kiosk/android-tablet.md;
+     set FFP_WALL_URL / FFP_WALL_PASSWORD or "wall": {"url": "http://<display>:2323", "password": …} in the config file)
 Every command prints JSON; add -q for a compact one-liner.
 """
 import argparse, base64, http.cookiejar, json, os, sys, urllib.parse, urllib.request
@@ -57,6 +61,33 @@ class Client:
             if e.code != 302: raise
         os.makedirs(os.path.dirname(COOKIES), exist_ok=True); self.jar.save(ignore_discard=True); os.chmod(COOKIES, 0o600)
         return self.req('GET', '')
+
+class Wall:
+    """Fully Kiosk Browser remote admin (REST on port 2323). Every call is a GET with cmd=…&password=…"""
+    INFO_KEYS = ('deviceModel', 'androidVersion', 'appVersionName', 'isLicensed', 'kioskMode', 'kioskLocked', 'screenOn',
+                 'currentPage', 'startUrl', 'ip4', 'wifiSignalLevel', 'displayWidthPixels', 'displayHeightPixels',
+                 'ramFreeMemory', 'internalStorageFreeSpace', 'foregroundApp', 'webviewUA')
+    def __init__(self, url, password):
+        if not url or not password: sys.stderr.write('wall: set FFP_WALL_URL + FFP_WALL_PASSWORD or "wall" in the config file\n'); sys.exit(2)
+        self.url = url.rstrip('/'); self.password = password
+    def raw(self, command, **params):
+        q = urllib.parse.urlencode({'cmd': command, 'password': self.password, **params})
+        with urllib.request.urlopen(f'{self.url}/?{q}', timeout=30) as resp: return resp.read(), resp.headers.get_content_type()
+    def cmd(self, command, **params):
+        body, ctype = self.raw(command, type='json', **params)
+        try: out = json.loads(body)
+        except ValueError: out = {'status': 'OK', 'body': body[:300].decode(errors='replace')}
+        if isinstance(out, dict) and out.get('status') == 'Error': sys.stderr.write(f'wall: {out.get("statustext", out)}\n'); sys.exit(1)
+        return out
+    def info(self):
+        d = self.cmd('deviceInfo'); return {k: d.get(k) for k in self.INFO_KEYS if k in d}
+    def shot(self, path):
+        body, ctype = self.raw('getScreenshot')
+        if not ctype.startswith('image/'): sys.stderr.write(f'wall: no screenshot ({body[:120]!r})\n'); sys.exit(1)
+        open(path, 'wb').write(body); return {'saved': path, 'bytes': len(body)}
+    def set(self, key, value):
+        v = parse_value(value); kind = 'setBooleanSetting' if isinstance(v, bool) else 'setStringSetting'
+        return self.cmd(kind, key=key, value=('true' if v is True else 'false' if v is False else str(value)))
 
 class NoRedirect(urllib.request.HTTPRedirectHandler):
     def redirect_request(self, *a, **k): return None
@@ -144,6 +175,21 @@ def main():
             import getpass; user = rest[1] if len(rest) > 1 else None; pw = getpass.getpass('new password: '); body = {'password': pw}; body.update({'username': user} if user else {}); return show(c.req('PATCH', 'access', body))
     if k == 'state': return show(c.req('GET', 'state'))
     if k == 'power': return show(c.req('GET', 'power'))
+    if k == 'wall':
+        wcfg = cfg.get('wall') or {}; w = Wall(os.environ.get('FFP_WALL_URL') or wcfg.get('url'), os.environ.get('FFP_WALL_PASSWORD') or wcfg.get('password'))
+        sub = rest[0] if rest else 'info'
+        if sub == 'info': return show(w.info())
+        if sub == 'shot': return show(w.shot(rest[1] if len(rest) > 1 else 'wall.png'))
+        if sub == 'reload': return show(w.cmd('loadStartURL'))
+        if sub == 'url': return show(w.cmd('loadURL', url=rest[1]))
+        if sub == 'restart': return show(w.cmd('restartApp'))
+        if sub == 'reboot': return show(w.cmd('rebootDevice'))
+        if sub == 'screen': return show(w.cmd('screenOn' if rest[1] == 'on' else 'screenOff'))
+        if sub == 'settings':
+            allv = w.cmd('listSettings'); pat = (rest[1] if len(rest) > 1 else '').lower()
+            return show({kk: v for kk, v in sorted(allv.items()) if pat in kk.lower() and not kk.endswith('Enc')})
+        if sub == 'set': return show(w.set(rest[1], rest[2]))
+        if sub == 'cmd': return show(w.cmd(rest[1], **dict(p.split('=', 1) for p in rest[2:])))
     sys.stderr.write(f'unknown command: {" ".join(cmd)}\n'); ap.print_help(); sys.exit(2)
 
 if __name__ == '__main__': main()
