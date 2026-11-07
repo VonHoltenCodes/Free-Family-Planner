@@ -400,7 +400,7 @@ async function loadEvents(showBusy = true, retry = true) {
     // In-browser Google only: ONE automatic renewal per page life. Every attempt opens Google's own
     // window, which on a tablet is a new tab laid over the planner — an hourly one looked like a freeze.
     if (gcal?.needsRefresh() && !autoRenewTried) { autoRenewTried = true; try { await gcal.refresh(); } catch (e) { noteError('gcal', `silent refresh failed: ${e.message}`); } }
-    if (gcal?.signedIn && !gcal.calendars.length) { await gcal.listCalendars(); renderCalSelect(); }
+    if (gcal?.signedIn && !gcal.calendars.length) { await gcal.listCalendars(); restoreCalChoice(); renderCalSelect(); }
     const all = await cal.loadAll();
     events = all.filter((e) => !e.isHoliday); holidays = all.filter((e) => e.isHoliday); stateSet('events', events);
     expandAll(); renderAll(); beat('calendar', 15 * 60_000);
@@ -423,12 +423,20 @@ async function loadEvents(showBusy = true, retry = true) {
 }
 function setWriteUI() { const w = cal.writable().length > 0; $('cal-add').hidden = !w; $('dp-add').hidden = !w; }
 cal.onLocalChange = () => loadEvents(false);
+// The calendar picked in the header survives reloads (a wall reloads itself nightly and used to wake up
+// on the primary calendar every morning): saved per display, with config.google.calendarId as the default.
+const CAL_CHOICE_KEY = 'fp.googleCalendarId';
+function restoreCalChoice() {
+  let saved = null; try { saved = localStorage.getItem(CAL_CHOICE_KEY); } catch { /* ignore */ }
+  const want = saved || config.google?.calendarId;
+  if (want && gcal.calendars.some((c) => c.id === want)) gcal.calendarId = want;
+}
 function renderCalSelect() {
   const sel = $('cal-select'); sel.innerHTML = '';
   gcal.calendars.forEach((c) => { const o = el('option', null, c.summary + (c.primary ? ' (Primary)' : '')); o.value = c.id; sel.appendChild(o); });
   sel.value = gcal.calendarId; sel.hidden = gcal.calendars.length < 2;
 }
-$('cal-select').addEventListener('change', (e) => { gcal.calendarId = e.target.value; loadEvents(); });
+$('cal-select').addEventListener('change', (e) => { gcal.calendarId = e.target.value; try { localStorage.setItem(CAL_CHOICE_KEY, e.target.value); } catch { /* ignore */ } loadEvents(); });
 $('cal-refresh').hidden = false;
 $('cal-refresh').addEventListener('click', () => loadEvents());
 $('cal-signout').addEventListener('click', () => gcal?.signOut());
