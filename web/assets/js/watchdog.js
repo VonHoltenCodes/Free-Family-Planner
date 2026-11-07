@@ -61,8 +61,14 @@ function reload(why) {
     () => { location.href = url + (url.includes('?') ? '&' : '?') + `_r=${Date.now()}`; },
     () => window.open(url, '_self'),
   ];
-  attempts.forEach((go, i) => setTimeout(() => { try { go(); } catch (e) { noteError('watchdog', `reload step ${i} threw: ${e.message}`); } }, i * 5000));
-  setTimeout(() => { reloading = 0; noteError('watchdog', `reload did not take effect (${why}) — still running`); }, 90_000);
+  // The steps are spaced well apart and cancelled the moment this document starts to unload: a slow
+  // tablet can take ten seconds to commit the new page, and firing the next step meanwhile cancels the
+  // navigation already under way and starts over (a wall once loaded itself four times in twelve
+  // seconds that way, then hung).
+  const timers = attempts.map((go, i) => setTimeout(() => { try { go(); } catch (e) { noteError('watchdog', `reload step ${i} threw: ${e.message}`); } }, i * 20_000));
+  timers.push(setTimeout(() => { reloading = 0; noteError('watchdog', `reload did not take effect (${why}) — still running`); }, 90_000));
+  const cancel = () => timers.forEach(clearTimeout);
+  window.addEventListener('pagehide', cancel, { once: true });
 }
 
 export function startWatchdog({ frame, nightlyHour = 4, recycleHours = 6, onStatus, onResume } = {}) {
@@ -97,7 +103,8 @@ export function startWatchdog({ frame, nightlyHour = 4, recycleHours = 6, onStat
   if (frame && recycleHours > 0) {
     setInterval(() => {
       const src = frame.getAttribute('src'); if (!src) return;
-      frame.src = src.replace(/([?&])_r=\d+/, '$1') + (src.includes('?') ? '&' : '?') + `_r=${Date.now()}`;
+      const base = src.replace(/[?&]_r=\d+/, '');
+      frame.src = base + (base.includes('?') ? '&' : '?') + `_r=${Date.now()}`;
       noteError('info', 'WeatherStar recycled');
     }, recycleHours * 3600_000);
   }
