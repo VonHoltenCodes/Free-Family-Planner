@@ -11,11 +11,13 @@ import { mountPower } from './power.js';
 import { startWatchdog, beat, health, noteError } from './watchdog.js';
 import { startPixelShift, startScreensaver } from './screensaver.js';
 import { sessionLost } from './session.js';
+import { isDemo, enterDemo, exitDemo, applyConfig as applyDemo, DEMO_ID } from './demo.js';
 // any module seeing a 401 from our own server says so; the hub polls every 15 s, so a lost sign-in is caught fast
 document.addEventListener('fp:unauthorized', (e) => sessionLost(e.detail, { toast }));
 import { loadDisplay, applyLayout, applyTheme, startDim, openDisplaySettings, setPanelAvailable, currentScreen, defaultTab, SCREENS, PANELS } from './display.js';
 
 const config = await loadConfig();
+if (isDemo()) applyDemo(config);   // sample data everywhere; see demo.js
 const display = loadDisplay();
 if (!display.active) display.active = defaultTab(config);
 applyTheme(display);
@@ -38,7 +40,7 @@ $('hdr-title').firstChild.textContent = config.family.title;
 $('hdr-subtitle').textContent = config.family.subtitle;
 $('wx-place').textContent = config.location.label || '';
 stateSet('family', { title: config.family.title, subtitle: config.family.subtitle, location: config.location.label || '' });
-$('btn-setup').addEventListener('click', () => openSetup(config));
+$('btn-setup').addEventListener('click', () => { if (config.demo) { toast('Leave demo mode (calendar picker) to change settings'); return; } openSetup(config); });
 $('btn-display').addEventListener('click', () => openDisplaySettings(display, config, () => {
   stopShift(); stopShift = startPixelShift(display.pixelShift); saver.wake(); if (display.choresPerKid !== CHORES_PER_KID) { location.reload(); return; } lastPortrait = null; fitCanvas(); tickClock(); if (config.location.lat != null) refreshWx(); if (typeof renderAll === 'function') renderAll(); dimTick(); }, { openTiles: () => openSetup(config, { step: 6 }) }));
 const dimTick = startDim(display);
@@ -62,7 +64,7 @@ startWatchdog({ frame: $('wx-frame'), nightlyHour: display.nightlyReload, recycl
   onResume: (secs) => catchUp(secs) });
 stateSet('health', health);   // the function, so every snapshot carries current numbers
 const build = (document.querySelector('script[src*="planner.js"]')?.src.match(/[?&]v=([^&]+)/) || [])[1] || 'dev';
-stateSet('runtime', () => ({ build, googleMode: cal.googleMode, googleOverride: cal.googleOverride || null, configSource: config.__source, droppedOverlay: !!config.__droppedOverlay }));
+stateSet('runtime', () => ({ build, demo: !!config.demo, googleMode: cal.googleMode, googleOverride: cal.googleOverride || null, configSource: config.__source, droppedOverlay: !!config.__droppedOverlay }));
 if (!isConfigured(config)) setTimeout(() => openSetup(config, { firstRun: true }), 600);
 { const want = new URLSearchParams(location.search).get('setup');
   const at = { family: 0, kids: 1, location: 2, data: 3, calendars: 4, weather: 5, hub: 6, access: 7 }[want];
@@ -192,7 +194,7 @@ if (config.power?.provider === 'comed') {
 (async () => {
   let st = null;
   try { st = await hub.status(); } catch (e) { if (e.status === 401 || /\b401\b/.test(e.message)) sessionLost('hub', { toast }); return; }   // static host / no endpoint: feature off
-  if (!st || st.type === 'none') return;
+  if (!st || st.type === 'none' || config.demo) return;   // demo: no house controls, no list sync
   $('svc-hub').hidden = false; $('led-hub-label').textContent = st.type === 'homeio' ? 'HOME-IO' : 'HOME ASSISTANT';
   const tiles = config.house?.tiles || [];
   setPanelAvailable('house', tiles.length > 0); lastPortrait = null; fitCanvas();
@@ -231,7 +233,7 @@ function bindList(name, formId, inputId, listId, countId) {
   }, (e) => { alive = false; noteError('store', `${name}: ${e?.message || e}`); led('led-fb', store.configured ? 'err' : 'warn'); });
 }
 if (!store.configured) led('led-fb', 'warn');
-$('led-fb-label').textContent = { firestore: 'FIRESTORE', sync: 'SYNC STORE', local: 'LOCAL DATA' }[store.backendName] || 'NO DATA';
+$('led-fb-label').textContent = { firestore: 'FIRESTORE', sync: 'SYNC STORE', local: 'LOCAL DATA', demo: 'DEMO DATA' }[store.backendName] || 'NO DATA';
 bindList('shopping', 'shop-form', 'shop-input', 'shop-list', 'shop-count');
 bindList('notes', 'note-form', 'note-input', 'note-list', null);
 
@@ -431,12 +433,25 @@ function restoreCalChoice() {
   const want = saved || config.google?.calendarId;
   if (want && gcal.calendars.some((c) => c.id === want)) gcal.calendarId = want;
 }
+// The picker lists the Google calendars plus "Demo (sample data)", which flips the whole planner to
+// fictional data for photos and screenshots (and back). The demo choice is a reload, not a load.
 function renderCalSelect() {
   const sel = $('cal-select'); sel.innerHTML = '';
-  gcal.calendars.forEach((c) => { const o = el('option', null, c.summary + (c.primary ? ' (Primary)' : '')); o.value = c.id; sel.appendChild(o); });
-  sel.value = gcal.calendarId; sel.hidden = gcal.calendars.length < 2;
+  const add = (value, label) => { const o = el('option', null, label); o.value = value; sel.appendChild(o); };
+  if (config.demo) { add(DEMO_ID, 'Demo (sample data)'); add('', '← Back to my calendars'); sel.value = DEMO_ID; sel.hidden = false; return; }
+  const cals = gcal?.calendars || [];
+  if (!cals.length) add('', 'My calendars');
+  cals.forEach((c) => add(c.id, c.summary + (c.primary ? ' (Primary)' : '')));
+  add(DEMO_ID, 'Demo (sample data)');
+  sel.value = cals.length ? gcal.calendarId : ''; sel.hidden = false;
 }
-$('cal-select').addEventListener('change', (e) => { gcal.calendarId = e.target.value; try { localStorage.setItem(CAL_CHOICE_KEY, e.target.value); } catch { /* ignore */ } loadEvents(); });
+$('cal-select').addEventListener('change', (e) => {
+  const v = e.target.value;
+  if (v === DEMO_ID) { enterDemo(); return; }
+  if (config.demo) { exitDemo(); return; }
+  if (!v) { renderCalSelect(); return; }   // the "My calendars" placeholder
+  gcal.calendarId = v; try { localStorage.setItem(CAL_CHOICE_KEY, v); } catch { /* ignore */ } loadEvents();
+});
 $('cal-refresh').hidden = false;
 $('cal-refresh').addEventListener('click', () => loadEvents());
 $('cal-signout').addEventListener('click', () => gcal?.signOut());
@@ -512,7 +527,7 @@ $('ev-delete').addEventListener('click', async () => {
 window.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('evt-overlay').hidden) closeModal(); });
 
 /* boot calendars */
-renderAll();
+renderAll(); renderCalSelect();
 (async () => {
   await cal.resolveGoogle(); gcal = cal.google;          // a server-held connection wins over the config
   if (cal.googleOverride) noteError('info', cal.googleOverride);

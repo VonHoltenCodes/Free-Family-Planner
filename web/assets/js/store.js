@@ -6,6 +6,7 @@
 import * as firestore from './backends/firestore.js';
 import * as sync from './backends/sync.js';
 import * as local from './backends/local.js';
+import { sampleData } from './demo.js';
 
 export const BACKENDS = { firestore, sync, local };
 let impl = null;
@@ -19,6 +20,7 @@ export function initStore(config) {
       if (!(config.firebase?.apiKey && config.firebase?.projectId)) throw new Error('Firebase not configured');
       impl = firestore.create(config.firebase);
     } else if (choice === 'sync') impl = sync.create();
+    else if (choice === 'demo') impl = local.createMemory('demo', sampleData());
     else impl = local.create();
     configured = true; backendName = impl.name;
   } catch (e) { console.warn('data backend unavailable:', e.message); impl = null; configured = false; }
